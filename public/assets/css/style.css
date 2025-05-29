@@ -1,0 +1,148 @@
+/* Custom styles for Parking Management System */
+
+/* Flash messages */
+.alert {
+    padding: 0.75rem 1.25rem;
+    margin-bottom: 1rem;
+    border: 1px solid transparent;
+    border-radius: 0.25rem;
+}
+
+.alert-success {
+    color: #155724;
+    background-color: #d4edda;
+    border-color: #c3e6cb;
+}
+
+.alert-danger {
+    color: #721c24;
+    background-color: #f8d7da;
+    border-color: #f5c6cb;
+}
+
+/* Parking space visualization */
+.parking-space {
+    width: 100%;
+    aspect-ratio: 1.5;
+    margin-bottom: 1rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 0.25rem;
+    font-weight: bold;
+    position: relative;
+    transition: all 0.3s ease;
+}
+
+.parking-space.available {
+    background-color: #d1fae5;
+    color: #065f46;
+    border: 2px solid #10b981;
+}
+
+.parking-space.occupied {
+    background-color: #fee2e2;
+    color: #7f1d1d;
+    border: 2px solid #ef4444;
+}
+
+.parking-space.reserved {
+    background-color: #fef3c7;
+    color: #92400e;
+    border: 2px solid #f59e0b;
+}
+
+.parking-space.handicap {
+    border-left: 6px solid #3b82f6;
+}
+
+.parking-space.vip {
+    border-left: 6px solid #8b5cf6;
+}
+
+.parking-space .space-number {
+    font-size: 1.25rem;
+}
+
+.parking-space .space-type {
+    position: absolute;
+    top: 0.25rem;
+    right: 0.25rem;
+    font-size: 0.75rem;
+}
+
+.parking-space .vehicle-info {
+    position: absolute;
+    bottom: 0.25rem;
+    left: 0;
+    right: 0;
+    text-align: center;
+    font-size: 0.75rem;
+}
+
+/* Dashboard metrics */
+.metric-card {
+    background-color: white;
+    border-radius: 0.5rem;
+    padding: 1.5rem;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    transition: transform 0.3s ease;
+}
+
+.metric-card:hover {
+    transform: translateY(-5px);
+}
+
+/* Custom pagination */
+.pagination {
+    display: flex;
+    list-style: none;
+    padding: 0;
+    margin: 1rem 0;
+}
+
+.pagination li {
+    margin: 0 0.25rem;
+}
+
+.pagination li a, .pagination li span {
+    display: block;
+    padding: 0.5rem 0.75rem;
+    border-radius: 0.25rem;
+    text-decoration: none;
+    transition: all 0.3s ease;
+}
+
+.pagination li a {
+    background-color: #f3f4f6;
+    color: #1f2937;
+}
+
+.pagination li a:hover {
+    background-color: #e5e7eb;
+}
+
+.pagination li.active span {
+    background-color: #3b82f6;
+    color: white;
+}
+
+/* Print styles for tickets */
+@media print {
+    header, footer, nav, .no-print {
+        display: none !important;
+    }
+    
+    body {
+        font-size: 12pt;
+        background: white;
+        color: black;
+    }
+    
+    .ticket {
+        border: 1px solid #ddd;
+        padding: 1rem;
+        margin: 0 auto;
+        max-width: 3.5in;
+    }
+}

@@ -1,0 +1,65 @@
+Login attempt - Email: admin@parking.com
+User found with ID: 1
+Stored hash: $2y$10$HfzIhGCCaxqyaIdGgjARSuOKAcm1Uy82YfLuNaajn6JrjLWy9Sj/W
+Password verification result: false
+
+Login attempt - Email: mehdi@gmail.com
+User found with ID: 2
+Stored hash: $2y$10$qbdIUc3iy60mOyO0XclMI.ZSimWctk0IqcDKO3zvLtxg/fL5XDhDa
+Password verification result: true
+
+Login attempt - Email: mehdi@gmail.com
+User found with ID: 2
+Stored hash: $2y$10$qbdIUc3iy60mOyO0XclMI.ZSimWctk0IqcDKO3zvLtxg/fL5XDhDa
+Password verification result: true
+
+Login attempt - Email: admin@parking.com
+User found with ID: 1
+Stored hash: $2y$10$HfzIhGCCaxqyaIdGgjARSuOKAcm1Uy82YfLuNaajn6JrjLWy9Sj/W
+Password verification result: false
+
+Login attempt - Email: mehdi@gmail.com
+User found with ID: 2
+Stored hash: $2y$10$qbdIUc3iy60mOyO0XclMI.ZSimWctk0IqcDKO3zvLtxg/fL5XDhDa
+Password verification result: true
+
+Login attempt - Email: admin@parking.com
+User found with ID: 1
+Stored hash: $2y$10$2vt.qDniTOW/JWt6/bOFUeZ7.7XLqf1WdgAVbATek.lKT06HDCr4u
+Password verification result: true
+
+Login attempt - Email: mehdi@gmail.com
+User found with ID: 2
+Stored hash: $2y$10$qbdIUc3iy60mOyO0XclMI.ZSimWctk0IqcDKO3zvLtxg/fL5XDhDa
+Password verification result: true
+
+Login attempt - Email: admin@parking.com
+User found with ID: 1
+Stored hash: $2y$10$2vt.qDniTOW/JWt6/bOFUeZ7.7XLqf1WdgAVbATek.lKT06HDCr4u
+Password verification result: true
+
+Login attempt - Email: mehdi@gmail.com
+User found with ID: 2
+Stored hash: $2y$10$qbdIUc3iy60mOyO0XclMI.ZSimWctk0IqcDKO3zvLtxg/fL5XDhDa
+Password verification result: true
+
+Login attempt - Email: admin@parking.com
+User found with ID: 1
+Stored hash: $2y$10$2vt.qDniTOW/JWt6/bOFUeZ7.7XLqf1WdgAVbATek.lKT06HDCr4u
+Password verification result: true
+
+Login attempt - Email: mehdi@gmail.com
+User found with ID: 2
+Stored hash: $2y$10$qbdIUc3iy60mOyO0XclMI.ZSimWctk0IqcDKO3zvLtxg/fL5XDhDa
+Password verification result: true
+
+Login attempt - Email: admin@parking.com
+User found with ID: 1
+Stored hash: $2y$10$2vt.qDniTOW/JWt6/bOFUeZ7.7XLqf1WdgAVbATek.lKT06HDCr4u
+Password verification result: true
+
+Login attempt - Email: mehdi@gmail.com
+User found with ID: 2
+Stored hash: $2y$10$qbdIUc3iy60mOyO0XclMI.ZSimWctk0IqcDKO3zvLtxg/fL5XDhDa
+Password verification result: true
+
