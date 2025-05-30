@@ -16,26 +16,29 @@ class Reservation extends Model
      * Get reservations based on criteria
      *
      * @param array $criteria Search criteria
+     * @param int $limit Maximum number of results to return
+     * @param int $offset Offset for pagination
      * @return array Reservations matching criteria
      */
-    public function getReservations($criteria = [])
+    public function getReservations($criteria = [], $limit = 10, $offset = 0)
     {
         try {
             $sql = "
                 SELECT r.*, ps.space_number, st.name as space_type, u.name as agent_name, 
-                       vt.name as vehicle_type_name
+                       v.owner_name as customer_name, vt.name as vehicle_type_name
                 FROM {$this->table} r
                 JOIN parking_spaces ps ON r.space_id = ps.id
                 JOIN space_types st ON ps.type_id = st.id
-                JOIN users u ON r.user_id = u.id
-                LEFT JOIN vehicle_types vt ON r.vehicle_type_id = vt.id
+                JOIN users u ON r.created_by = u.id
+                JOIN vehicles v ON r.vehicle_id = v.id
+                LEFT JOIN vehicle_types vt ON v.type_id = vt.id
                 WHERE 1=1
             ";
             
             $params = [];
             
             if (!empty($criteria['customer_name'])) {
-                $sql .= " AND r.customer_name LIKE :customer_name";
+                $sql .= " AND v.owner_name LIKE :customer_name";
                 $params[':customer_name'] = '%' . $criteria['customer_name'] . '%';
             }
             
@@ -55,9 +58,15 @@ class Reservation extends Model
             }
             
             $sql .= " ORDER BY r.start_time ASC";
+            $sql .= " LIMIT :limit OFFSET :offset";
             
             $stmt = $this->db->prepare($sql);
             
+            // Bind pagination parameters
+            $stmt->bindValue(':limit', (int)$limit, PDO::PARAM_INT);
+            $stmt->bindValue(':offset', (int)$offset, PDO::PARAM_INT);
+            
+            // Bind other parameters
             foreach ($params as $key => $value) {
                 $stmt->bindValue($key, $value);
             }
@@ -120,38 +129,31 @@ class Reservation extends Model
     /**
      * Create a new reservation
      *
-     * @param array $data Reservation data
+     * @param int $vehicleId Vehicle ID
+     * @param int $spaceId Space ID
+     * @param string $startTime Reservation start time
+     * @param string $endTime Reservation end time
      * @param int $userId ID of the user creating the reservation
      * @return int|false The reservation ID or false on failure
      */
-    public function createReservation($data, $userId)
+    public function createReservation($vehicleId, $spaceId, $startTime, $endTime, $userId)
     {
         try {
+            $status = 'pending'; // or 'confirmed'
             $stmt = $this->db->prepare("
                 INSERT INTO {$this->table} (
-                    customer_name, customer_email, customer_phone, 
-                    space_id, vehicle_type_id, license_plate,
-                    start_time, end_time, notes, status, user_id
+                    vehicle_id, space_id, start_time, end_time, status, created_by
                 ) VALUES (
-                    :customer_name, :customer_email, :customer_phone,
-                    :space_id, :vehicle_type_id, :license_plate,
-                    :start_time, :end_time, :notes, 'active', :user_id
+                    :vehicle_id, :space_id, :start_time, :end_time, :status, :created_by
                 )
             ");
-            
-            $stmt->bindParam(':customer_name', $data['customer_name']);
-            $stmt->bindParam(':customer_email', $data['customer_email']);
-            $stmt->bindParam(':customer_phone', $data['customer_phone']);
-            $stmt->bindParam(':space_id', $data['space_id'], PDO::PARAM_INT);
-            $stmt->bindParam(':vehicle_type_id', $data['vehicle_type_id'], PDO::PARAM_INT);
-            $stmt->bindParam(':license_plate', $data['license_plate']);
-            $stmt->bindParam(':start_time', $data['start_time']);
-            $stmt->bindParam(':end_time', $data['end_time']);
-            $stmt->bindParam(':notes', $data['notes']);
-            $stmt->bindParam(':user_id', $userId, PDO::PARAM_INT);
-            
+            $stmt->bindParam(':vehicle_id', $vehicleId, PDO::PARAM_INT);
+            $stmt->bindParam(':space_id', $spaceId, PDO::PARAM_INT);
+            $stmt->bindParam(':start_time', $startTime);
+            $stmt->bindParam(':end_time', $endTime);
+            $stmt->bindParam(':status', $status);
+            $stmt->bindParam(':created_by', $userId, PDO::PARAM_INT);
             $stmt->execute();
-            
             return $this->db->lastInsertId();
         } catch (\PDOException $e) {
             error_log($e->getMessage());
@@ -170,18 +172,17 @@ class Reservation extends Model
         try {
             $stmt = $this->db->prepare("
                 SELECT r.*, ps.space_number, st.name as space_type, st.hourly_rate,
-                       u.name as agent_name, vt.name as vehicle_type_name
+                       u.name as agent_name, v.owner_name as customer_name, v.license_plate, vt.name as vehicle_type
                 FROM {$this->table} r
                 JOIN parking_spaces ps ON r.space_id = ps.id
                 JOIN space_types st ON ps.type_id = st.id
-                JOIN users u ON r.user_id = u.id
-                LEFT JOIN vehicle_types vt ON r.vehicle_type_id = vt.id
+                JOIN users u ON r.created_by = u.id
+                JOIN vehicles v ON r.vehicle_id = v.id
+                LEFT JOIN vehicle_types vt ON v.type_id = vt.id
                 WHERE r.id = :id
             ");
-            
             $stmt->bindParam(':id', $id, PDO::PARAM_INT);
             $stmt->execute();
-            
             return $stmt->fetch(PDO::FETCH_OBJ);
         } catch (\PDOException $e) {
             error_log($e->getMessage());
