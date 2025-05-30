@@ -216,8 +216,19 @@ class AgentController extends Controller
         $data = [
             'title' => 'Manage Reservations',
             'criteria' => [],
-            'reservations' => []
+            'reservations' => [],
+            'offset' => 0,
+            'limit' => 10 // Show 10 results per page by default
         ];
+        
+        // Handle pagination
+        if (isset($_GET['offset']) && is_numeric($_GET['offset'])) {
+            $data['offset'] = max(0, (int)$_GET['offset']);
+        }
+        
+        if (isset($_GET['limit']) && is_numeric($_GET['limit'])) {
+            $data['limit'] = max(1, min(50, (int)$_GET['limit'])); // Limit between 1 and 50
+        }
         
         // Handle search/filter criteria
         if ($_SERVER['REQUEST_METHOD'] === 'GET' && !empty($_GET)) {
@@ -240,11 +251,11 @@ class AgentController extends Controller
             
             // Get filtered reservations
             $reservationModel = $this->model('Reservation');
-            $data['reservations'] = $reservationModel->getReservations($data['criteria']);
+            $data['reservations'] = $reservationModel->getReservations($data['criteria'], $data['limit'], $data['offset']);
         } else {
             // Get all active reservations by default
             $reservationModel = $this->model('Reservation');
-            $data['reservations'] = $reservationModel->getReservations(['status' => 'active']);
+            $data['reservations'] = $reservationModel->getReservations(['status' => 'active'], $data['limit'], $data['offset']);
         }
         
         $this->view('agent/reservations', $data);
@@ -329,8 +340,56 @@ class AgentController extends Controller
                     return;
                 }
                 
-                // Create reservation
-                $reservationId = $reservationModel->createReservation($data['formData'], $_SESSION['user_id']);
+                // Handle vehicle first - vehicle_id is required in the database
+                $vehicleModel = $this->model('Vehicle');
+                $vehicleId = null;
+                
+                // If license plate is provided, find or create the vehicle
+                if (!empty($data['formData']['license_plate'])) {
+                    // Try to find existing vehicle
+                    $vehicle = $vehicleModel->getVehicleByLicensePlate($data['formData']['license_plate']);
+                    
+                    if ($vehicle) {
+                        $vehicleId = $vehicle->id;
+                    } else {
+                        // Create new vehicle
+                        $vehicleTypeId = !empty($data['formData']['vehicle_type_id']) ? $data['formData']['vehicle_type_id'] : 1; // Default to type 1 (Car) if not specified
+                        $vehicleData = [
+                            'license_plate' => $data['formData']['license_plate'],
+                            'type_id' => $vehicleTypeId,
+                            'owner_name' => $data['formData']['customer_name'],
+                            'owner_phone' => $data['formData']['customer_phone'] ?? null
+                        ];
+                        
+                        $vehicleId = $vehicleModel->createVehicle($vehicleData);
+                    }
+                } else {
+                    // No license plate provided, create a temporary vehicle with a placeholder license plate
+                    $placeholderLicense = 'TEMP-' . time() . '-' . rand(1000, 9999);
+                    $vehicleTypeId = !empty($data['formData']['vehicle_type_id']) ? $data['formData']['vehicle_type_id'] : 1; // Default to type 1 (Car) if not specified
+                    $vehicleData = [
+                        'license_plate' => $placeholderLicense,
+                        'type_id' => $vehicleTypeId,
+                        'owner_name' => $data['formData']['customer_name'],
+                        'owner_phone' => $data['formData']['customer_phone'] ?? null
+                    ];
+                    
+                    $vehicleId = $vehicleModel->createVehicle($vehicleData);
+                }
+                
+                // If we couldn't create or find a vehicle, show an error
+                if (!$vehicleId) {
+                    $data['errors']['general'] = 'Failed to create or find vehicle';
+                    $this->view('agent/create_reservation', $data);
+                    return;
+                }
+                
+                $spaceId = $data['formData']['space_id'];
+                $startTime = $data['formData']['start_time'];
+                $endTime = $data['formData']['end_time'];
+                $userId = $_SESSION['user_id'];
+                
+                $reservationId = $reservationModel->createReservation($vehicleId, $spaceId, $startTime, $endTime, $userId);
                 
                 if ($reservationId) {
                     flash('reservation_success', 'Reservation created successfully');
@@ -352,6 +411,44 @@ class AgentController extends Controller
      * @return void
      */
     public function viewReservation($id)
+    {
+        // Get reservation details
+        $reservationModel = $this->model('Reservation');
+        $reservation = $reservationModel->getReservationById($id);
+        
+        if (!$reservation) {
+            flash('reservation_error', 'Reservation not found', 'alert alert-danger');
+            $this->redirect('agent/reservations');
+            return;
+        }
+        
+        // Get space details
+        $spaceModel = $this->model('ParkingSpace');
+        $space = $spaceModel->getSpaceDetails($reservation->space_id);
+        
+        // Get vehicle details
+        $vehicleModel = $this->model('Vehicle');
+        $vehicle = $vehicleModel->getWithActiveParking($reservation->vehicle_id);
+        
+        // Get existing reservations for this space (for timeline display)
+        $existingReservations = $reservationModel->getUpcomingReservationsForSpace($reservation->space_id);
+        
+        // Prepare data for view
+        $data = [
+            'title' => 'Reservation Details',
+            'reservation' => $reservation,
+            'space' => $space,
+            'vehicle' => $vehicle,
+            'existingReservations' => $existingReservations
+        ];
+        
+        $this->view('agent/view_reservation', $data);
+    }
+    
+    /**
+     * This was a duplicate viewReservation method - removed to fix syntax error
+     */
+    /*public function duplicateViewReservation($id)
     {
         $reservationModel = $this->model('Reservation');
         $reservation = $reservationModel->getReservationById($id);
@@ -376,7 +473,7 @@ class AgentController extends Controller
         ];
         
         $this->view('agent/view_reservation', $data);
-    }
+    }*/
     
     /**
      * Parking map view
