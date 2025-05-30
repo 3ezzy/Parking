@@ -63,3 +63,13 @@ User found with ID: 2
 Stored hash: $2y$10$qbdIUc3iy60mOyO0XclMI.ZSimWctk0IqcDKO3zvLtxg/fL5XDhDa
 Password verification result: true
 
+Login attempt - Email: mehdi@gmail.com
+User found with ID: 2
+Stored hash: $2y$10$qbdIUc3iy60mOyO0XclMI.ZSimWctk0IqcDKO3zvLtxg/fL5XDhDa
+Password verification result: false
+
+Login attempt - Email: mehdi@gmail.com
+User found with ID: 2
+Stored hash: $2y$10$qbdIUc3iy60mOyO0XclMI.ZSimWctk0IqcDKO3zvLtxg/fL5XDhDa
+Password verification result: true
+
