@@ -205,4 +205,45 @@ class Vehicle extends Model
             return false;
         }
     }
+    
+    /**
+     * Get a vehicle by license plate
+     *
+     * @param string $licensePlate The license plate to search for
+     * @return object|false The vehicle or false if not found
+     */
+    public function getVehicleByLicensePlate($licensePlate)
+    {
+        return $this->findByLicensePlate($licensePlate);
+    }
+    
+    /**
+     * Create a new vehicle
+     *
+     * @param array $data Vehicle data
+     * @return int|false The new vehicle ID or false on failure
+     */
+    public function createVehicle($data)
+    {
+        try {
+            $stmt = $this->db->prepare("
+                INSERT INTO {$this->table} (
+                    license_plate, type_id, owner_name, owner_phone
+                ) VALUES (
+                    :license_plate, :type_id, :owner_name, :owner_phone
+                )
+            ");
+            
+            $stmt->bindParam(':license_plate', $data['license_plate']);
+            $stmt->bindParam(':type_id', $data['type_id'], PDO::PARAM_INT);
+            $stmt->bindParam(':owner_name', $data['owner_name']);
+            $stmt->bindParam(':owner_phone', $data['owner_phone']);
+            
+            $stmt->execute();
+            return $this->db->lastInsertId();
+        } catch (\PDOException $e) {
+            error_log($e->getMessage());
+            return false;
+        }
+    }
 }
