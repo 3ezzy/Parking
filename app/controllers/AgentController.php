@@ -190,7 +190,12 @@ class AgentController extends Controller
                 $licensePlate = $data['formData']['license_plate'];
                 
                 // Check if vehicle exists and is parked
-                $vehicleWithParking = $this->vehicleModel->getWithActiveParking($licensePlate);
+                $vehicle = $this->vehicleModel->findByLicensePlate($licensePlate);
+                if ($vehicle) {
+                    $vehicleWithParking = $this->vehicleModel->getWithActiveParking($vehicle->id);
+                } else {
+                    $vehicleWithParking = null;
+                }
                 
                 if (!$vehicleWithParking || !isset($vehicleWithParking->ticket_id)) {
                     $data['errors']['license_plate'] = 'Vehicle not found or not currently parked';
