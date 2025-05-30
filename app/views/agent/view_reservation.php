@@ -17,18 +17,27 @@
                 <div class="flex justify-between items-center mb-4">
                     <h2 class="text-xl font-semibold text-blue-800">Reservation Details</h2>
                     <span class="text-sm">
-                        <?php if ($reservation->status === 'active'): ?>
-                            <?php if (strtotime($reservation->start_time) <= time() && strtotime($reservation->end_time) >= time()): ?>
+                        <?php if (
+                            $reservation->status === 'active') : ?>
+                            <?php if (strtotime($reservation->start_time) <= time() && strtotime($reservation->end_time) >= time()) : ?>
                                 <span class="bg-yellow-500 text-white px-3 py-1 rounded">Current</span>
-                            <?php elseif (strtotime($reservation->start_time) > time()): ?>
+                            <?php elseif (strtotime($reservation->start_time) > time()) : ?>
                                 <span class="bg-blue-500 text-white px-3 py-1 rounded">Upcoming</span>
-                            <?php else: ?>
+                            <?php else : ?>
                                 <span class="bg-red-500 text-white px-3 py-1 rounded">Expired</span>
                             <?php endif; ?>
-                        <?php elseif ($reservation->status === 'completed'): ?>
+                        <?php elseif ($reservation->status === 'completed') : ?>
                             <span class="bg-green-500 text-white px-3 py-1 rounded">Completed</span>
-                        <?php else: ?>
+                        <?php elseif ($reservation->status === 'pending') : ?>
+                            <span class="bg-purple-500 text-white px-3 py-1 rounded">Pending</span>
+                        <?php elseif ($reservation->status === 'confirmed') : ?>
+                            <span class="bg-blue-500 text-white px-3 py-1 rounded">Confirmed</span>
+                        <?php elseif ($reservation->status === 'cancelled') : ?>
                             <span class="bg-red-500 text-white px-3 py-1 rounded">Cancelled</span>
+                        <?php elseif ($reservation->status === 'no_show') : ?>
+                            <span class="bg-gray-500 text-white px-3 py-1 rounded">No Show</span>
+                        <?php else : ?>
+                            <span class="bg-gray-500 text-white px-3 py-1 rounded"><?= ucfirst($reservation->status) ?></span>
                         <?php endif; ?>
                     </span>
                 </div>
