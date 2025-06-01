@@ -8,12 +8,6 @@
                     <h3 class="text-lg font-bold"><?= SITE_NAME ?></h3>
                     <p class="text-sm text-blue-200 mt-1">Efficient parking management solution</p>
                 </div>
-                
-                <div class="flex space-x-4">
-                    <a href="<?= URL_ROOT ?>" class="text-blue-200 hover:text-white transition">Home</a>
-                    <a href="<?= URL_ROOT ?>/home/about" class="text-blue-200 hover:text-white transition">About</a>
-                    <a href="<?= URL_ROOT ?>/home/contact" class="text-blue-200 hover:text-white transition">Contact</a>
-                </div>
             </div>
             
             <div class="mt-6 text-center text-sm text-blue-200">

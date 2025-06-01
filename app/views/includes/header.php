@@ -36,6 +36,7 @@
                     <?php if(isLoggedIn()): ?>
                         <?php if(hasRole(ADMIN_ROLE)): ?>
                             <a href="<?= URL_ROOT ?>/admin/dashboard" class="hover:text-blue-200 transition">Admin Dashboard</a>
+                            <a href="<?= URL_ROOT ?>/admin/settings" class="hover:text-blue-200 transition">Settings</a>
                         <?php elseif(hasRole(AGENT_ROLE)): ?>
                             <a href="<?= URL_ROOT ?>/agent/dashboard" class="hover:text-blue-200 transition">Agent Dashboard</a>
                         <?php endif; ?>
@@ -57,6 +58,7 @@
                 <?php if(isLoggedIn()): ?>
                     <?php if(hasRole(ADMIN_ROLE)): ?>
                         <a href="<?= URL_ROOT ?>/admin/dashboard" class="block py-2 hover:text-blue-200 transition">Admin Dashboard</a>
+                        <a href="<?= URL_ROOT ?>/admin/settings" class="block py-2 hover:text-blue-200 transition">Settings</a>
                     <?php elseif(hasRole(AGENT_ROLE)): ?>
                         <a href="<?= URL_ROOT ?>/agent/dashboard" class="block py-2 hover:text-blue-200 transition">Agent Dashboard</a>
                     <?php endif; ?>
