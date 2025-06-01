@@ -3,6 +3,7 @@ namespace App\Controllers;
 
 use App\Core\Controller;
 use App\Middlewares\AuthMiddleware;
+     
 
 /**
  * Admin Controller
@@ -63,6 +64,22 @@ class AdminController extends Controller
         ];
         
         $this->view('admin/dashboard', $data);
+    }
+    
+    /**
+     * Add settings method to load the settings page
+     *
+     * @return void
+     */
+    public function settings()
+    {
+        // Fetch settings data if needed (replace with actual logic)
+        $settings = []; // or fetch from a Settings model if you have one
+        $data = [
+            'title' => 'Settings',
+            'settings' => $settings
+        ];
+        $this->view('admin/settings', $data);
     }
     
     /**
