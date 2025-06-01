@@ -74,10 +74,12 @@ class AdminController extends Controller
     public function settings()
     {
         // Fetch settings data if needed (replace with actual logic)
-        $settings = []; // or fetch from a Settings model if you have one
+        $settings = [];
+        $paymentMethods = [];
         $data = [
             'title' => 'Settings',
-            'settings' => $settings
+            'settings' => $settings,
+            'paymentMethods' => $paymentMethods
         ];
         $this->view('admin/settings', $data);
     }
