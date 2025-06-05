@@ -12,6 +12,16 @@ use DateTime;
 class ParkingTicket extends Model
 {
     protected $table = 'parking_tickets';
+    protected $id;
+    protected $vehicle_id;
+    protected $space_id;
+    protected $entry_time;
+    protected $exit_time;
+    protected $amount_paid;
+    protected $status;
+    protected $created_by;
+    protected $created_at;
+    protected $updated_at;
     
     /**
      * Create a new parking ticket
