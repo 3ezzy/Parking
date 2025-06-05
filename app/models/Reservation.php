@@ -11,6 +11,15 @@ use PDO;
 class Reservation extends Model
 {
     protected $table = 'reservations';
+    protected $id;
+    protected $vehicle_id;
+    protected $space_id;
+    protected $start_time;
+    protected $end_time;
+    protected $status;
+    protected $created_by;
+    protected $created_at;
+    protected $updated_at;
     
     /**
      * Get reservations based on criteria
