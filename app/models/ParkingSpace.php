@@ -11,6 +11,14 @@ use PDO;
 class ParkingSpace extends Model
 {
     protected $table = 'parking_spaces';
+    protected $id;
+    protected $space_number;
+    protected $type_id;
+    protected $status;
+    protected $floor;
+    protected $zone;
+    protected $created_at;
+    protected $updated_at;
     
     /**
      * Get all parking spaces with their type information
