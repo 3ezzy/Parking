@@ -7,6 +7,11 @@ use PDO;
 class ActivityLog extends Model
 {
     protected $table = 'activity_logs';
+    protected $id;
+    protected $user_id;
+    protected $activity;
+    protected $ip_address;
+    protected $timestamp;
 
     public function log($userId, $activity, $ipAddress = null)
     {
