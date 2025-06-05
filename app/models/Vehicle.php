@@ -12,6 +12,13 @@ use \PDOException;
 class Vehicle extends Model
 {
     protected $table = 'vehicles';
+    protected $id;
+    protected $license_plate;
+    protected $type_id;
+    protected $owner_name;
+    protected $owner_phone;
+    protected $created_at;
+    protected $updated_at;
     
     /**
      * Get all vehicles with their type information
