@@ -11,6 +11,13 @@ use PDO;
 class User extends Model
 {
     protected $table = 'users';
+    protected $id;
+    protected $name;
+    protected $email;
+    protected $password;
+    protected $role;
+    protected $created_at;
+    protected $updated_at;
     
     /**
      * Register a new user
