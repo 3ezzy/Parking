@@ -3,6 +3,7 @@ namespace App\Models;
 
 use App\Core\Model;
 use PDO;
+use PDOException;
 use DateTime;
 
 /**
