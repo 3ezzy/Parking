@@ -13,6 +13,7 @@ class ParkingSpace extends Model
     protected $table = 'parking_spaces';
     protected $id;
     protected $space_number;
+    protected $type;
     protected $type_id;
     protected $status;
     protected $floor;

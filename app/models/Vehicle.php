@@ -14,6 +14,7 @@ class Vehicle extends Model
     protected $table = 'vehicles';
     protected $id;
     protected $license_plate;
+    protected $type;
     protected $type_id;
     protected $owner_name;
     protected $owner_phone;
