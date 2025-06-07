@@ -148,7 +148,7 @@ class Reservation extends Model
     public function createReservation($vehicleId, $spaceId, $startTime, $endTime, $userId)
     {
         try {
-            $status = 'pending'; // or 'confirmed'
+            $status = 'active'; // Default status for new reservations
             $stmt = $this->db->prepare("
                 INSERT INTO {$this->table} (
                     vehicle_id, space_id, start_time, end_time, status, created_by
@@ -199,6 +199,33 @@ class Reservation extends Model
         }
     }
     
+    /**
+     * Update the status of a specific reservation.
+     *
+     * @param int $id The ID of the reservation to update.
+     * @param string $newStatus The new status for the reservation.
+     * @return bool True on success, false on failure.
+     */
+    public function updateReservationStatus($id, $newStatus)
+    {
+        try {
+            $stmt = $this->db->prepare("
+                UPDATE {$this->table} SET
+                    status = :status,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE id = :id
+            ");
+            
+            $stmt->bindParam(':status', $newStatus, PDO::PARAM_STR);
+            $stmt->bindParam(':id', $id, PDO::PARAM_INT);
+            
+            return $stmt->execute();
+        } catch (\PDOException $e) {
+            error_log("Error updating reservation status: " . $e->getMessage());
+            return false;
+        }
+    }
+
     /**
      * Update a reservation
      *
