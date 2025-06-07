@@ -1,5 +1,10 @@
 <?php require APP . 'views/includes/header.php'; ?>
 
+<?php
+if (!isset($offset)) $offset = 0;
+if (!isset($limit)) $limit = 10;
+?>
+
 <div class="bg-white rounded-lg shadow-md p-6 mb-6">
     <div class="flex justify-between items-center mb-4">
         <h1 class="text-2xl font-bold text-blue-800"><?= $title ?></h1>
@@ -149,7 +154,15 @@
                                     <?php endif; ?>
                                 </td>
                                 <td class="px-4 py-2 border">
-                                    <?php if ($user->status === 'active'): ?>
+                                    <?php 
+                                    $isEffectivelyActive = false;
+                                    if (isset($user->role) && ($user->role === 'admin' || $user->role === 'agent')) {
+                                        $isEffectivelyActive = true;
+                                    } elseif (isset($user->status) && $user->status === 'active') {
+                                        $isEffectivelyActive = true;
+                                    }
+                                    ?>
+                                    <?php if ($isEffectivelyActive): ?>
                                         <span class="bg-green-100 text-green-800 px-2 py-1 rounded text-xs">Active</span>
                                     <?php else: ?>
                                         <span class="bg-red-100 text-red-800 px-2 py-1 rounded text-xs">Inactive</span>
