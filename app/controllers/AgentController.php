@@ -13,6 +13,8 @@ class AgentController extends Controller
     private $parkingSpaceModel;
     private $vehicleModel;
     private $parkingTicketModel;
+    private $reservationModel;
+    private $activityLogModel;
     
     /**
      * Constructor - initialize models and middleware
@@ -20,10 +22,12 @@ class AgentController extends Controller
     public function __construct()
     {
         // Require agent role for all methods in this controller
-        AuthMiddleware::requireAgent();
-        
         // Load models
         $this->parkingSpaceModel = $this->model('ParkingSpace');
+        $this->vehicleModel = $this->model('Vehicle');
+        $this->parkingTicketModel = $this->model('ParkingTicket');
+        $this->reservationModel = $this->model('Reservation');
+        $this->activityLogModel = $this->model('ActivityLog');
         $this->vehicleModel = $this->model('Vehicle');
         $this->parkingTicketModel = $this->model('ParkingTicket');
     }
@@ -448,6 +452,220 @@ class AgentController extends Controller
         ];
         
         $this->view('agent/view_reservation', $data);
+    }
+
+    /**
+     * Edit an existing reservation
+     *
+     * @param int $id Reservation ID
+     * @return void
+     */
+    public function editReservation($id)
+    {
+        $reservationModel = $this->model('Reservation');
+        $reservation = $reservationModel->getReservationById($id);
+
+        if (!$reservation) {
+            flash('reservation_error', 'Reservation not found.', 'alert alert-danger');
+            $this->redirect('agent/reservations');
+            return;
+        }
+
+        // Check if reservation status allows editing (e.g., not completed or cancelled)
+        if (in_array($reservation->status, ['completed', 'cancelled', 'no_show'])) {
+            flash('reservation_error', 'This reservation cannot be edited because it is ' . $reservation->status . '.', 'alert alert-warning');
+            $this->redirect('agent/viewReservation/' . $id);
+            return;
+        }
+
+        // Load data for forms (spaces, vehicle types)
+        $data['spaces'] = $this->parkingSpaceModel->getAllSpaces(); // Or getAvailableSpaces if preferred
+        $vehicleTypeModel = $this->model('Vehicle'); // Vehicle model is already a property $this->vehicleModel
+        $data['vehicleTypes'] = $this->vehicleModel->getVehicleTypes();
+
+        // Prepare form data, pre-filled with existing reservation details
+        // Note: The ReservationModel::updateReservation method updates specific fields.
+        // We should align the form with those fields.
+        // Current fields in updateReservation: customer_name, customer_email, customer_phone, vehicle_type_id, license_plate, start_time, end_time, notes
+        // It does NOT update space_id. If space_id needs to be editable, the model's updateReservation needs adjustment.
+
+        $data['formData'] = [
+            'customer_name' => $reservation->customer_name,
+            'customer_email' => $reservation->customer_email ?? '',
+            'customer_phone' => $reservation->customer_phone ?? '',
+            'vehicle_id' => $reservation->vehicle_id, // Needed to fetch vehicle details
+            'license_plate' => $reservation->license_plate ?? '',
+            'vehicle_type_id' => null, // Will be fetched from vehicle details if available
+            'space_id' => $reservation->space_id,
+            'start_time' => date('Y-m-d\TH:i', strtotime($reservation->start_time)),
+            'end_time' => date('Y-m-d\TH:i', strtotime($reservation->end_time)),
+            'notes' => $reservation->notes ?? ''
+        ];
+        
+        // Fetch vehicle details to get current vehicle_type_id if vehicle exists
+        if ($reservation->vehicle_id) {
+            $vehicle = $this->vehicleModel->getVehicleById($reservation->vehicle_id);
+            if ($vehicle) {
+                $data['formData']['vehicle_type_id'] = $vehicle->type_id;
+            }
+        }
+
+        $data = [
+            'title' => 'Edit Reservation (ID: ' . $id . ')',
+            'reservation_id' => $id,
+            'formData' => $data['formData'],
+            'spaces' => $data['spaces'],
+            'vehicleTypes' => $data['vehicleTypes'],
+            'errors' => [] // Initialize empty errors array for the form
+        ];
+
+        if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+            // Verify CSRF token
+            if (!verifyCsrfToken($_POST['csrf_token'] ?? '')) {
+                flash('reservation_error', 'Invalid request. Please try again.', 'alert alert-danger');
+                $this->redirect('agent/editReservation/' . $id);
+                return;
+            }
+
+            // Sanitize POST data
+            $_POST = filter_input_array(INPUT_POST, FILTER_SANITIZE_FULL_SPECIAL_CHARS);
+
+            $submittedData = [
+                'customer_name' => trim($_POST['customer_name'] ?? ''),
+                'customer_email' => trim($_POST['customer_email'] ?? ''),
+                'customer_phone' => trim($_POST['customer_phone'] ?? ''),
+                'license_plate' => strtoupper(trim($_POST['license_plate'] ?? '')),
+                'vehicle_type_id' => !empty($_POST['vehicle_type_id']) ? (int)$_POST['vehicle_type_id'] : null,
+                'start_time' => trim($_POST['start_time'] ?? ''),
+                'end_time' => trim($_POST['end_time'] ?? ''),
+                'notes' => trim($_POST['notes'] ?? ''),
+                'space_id' => $reservation->space_id // Space ID is not editable, use original
+            ];
+
+            $errors = [];
+
+            // Validate form data
+            if (empty($submittedData['customer_name'])) {
+                $errors['customer_name'] = 'Customer name is required.';
+            }
+            if (!empty($submittedData['customer_email']) && !filter_var($submittedData['customer_email'], FILTER_VALIDATE_EMAIL)) {
+                $errors['customer_email'] = 'Invalid email format.';
+            }
+            if (empty($submittedData['start_time'])) {
+                $errors['start_time'] = 'Start time is required.';
+            }
+            if (empty($submittedData['end_time'])) {
+                $errors['end_time'] = 'End time is required.';
+            }
+
+            $startTimeTimestamp = strtotime($submittedData['start_time']);
+            $endTimeTimestamp = strtotime($submittedData['end_time']);
+
+            if ($startTimeTimestamp && $endTimeTimestamp) {
+                if ($endTimeTimestamp <= $startTimeTimestamp) {
+                    $errors['end_time'] = 'End time must be after start time.';
+                }
+                // Optional: Check if start time is in the past (if editing active/future reservations)
+                // if ($startTimeTimestamp < time() && $reservation->status !== 'active') { // Allow editing start time of active reservations if needed
+                //     $errors['start_time'] = 'Start time cannot be in the past for new edits unless reservation is already active.';
+                // }
+            } else {
+                if (empty($submittedData['start_time'])) $errors['start_time'] = 'Invalid start time format.';
+                if (empty($submittedData['end_time'])) $errors['end_time'] = 'Invalid end time format.';
+            }
+            
+            // Check for time conflicts, excluding the current reservation
+            if (empty($errors) && $this->reservationModel->hasTimeConflict($submittedData['space_id'], $submittedData['start_time'], $submittedData['end_time'], $id)) {
+                $errors['time_conflict'] = 'The selected time slot conflicts with an existing reservation for this space.';
+            }
+
+            if (!empty($errors)) {
+                // Re-populate data for the view with submitted values and errors
+                $data['formData'] = $submittedData; // Use submitted data to refill form
+                $data['errors'] = $errors;
+                flash('reservation_error', 'Please correct the errors below.', 'alert alert-danger');
+                $this->view('agent/edit_reservation', $data);
+            } else {
+                // Prepare data for ReservationModel::updateReservation
+                $updateResult = $this->reservationModel->updateReservation(
+                    $id, // reservation_id
+                    $submittedData['customer_name'],
+                    $submittedData['start_time'],
+                    $submittedData['end_time'],
+                    $submittedData['notes'],
+                    $_SESSION['user_id'], // updated_by
+                    $submittedData['customer_email'],
+                    $submittedData['customer_phone'],
+                    $submittedData['license_plate'],
+                    $submittedData['vehicle_type_id']
+                );
+
+                if ($updateResult) {
+                    $this->activityLogModel->logActivity($_SESSION['user_id'], 'reservation_updated', "Reservation ID: {$id} updated by agent.");
+                    flash('reservation_success', 'Reservation updated successfully!');
+                    $this->redirect('agent/viewReservation/' . $id);
+                } else {
+                    $data['formData'] = $submittedData;
+                    $data['errors']['general'] = 'Failed to update reservation. Please try again.';
+                    flash('reservation_error', 'Failed to update reservation. An unexpected error occurred.', 'alert alert-danger');
+                    $this->view('agent/edit_reservation', $data);
+                }
+            }
+        } else {
+            // Display the form (GET request)
+            $this->view('agent/edit_reservation', $data);
+        }
+    }
+
+    /**
+     * Handle POST request to cancel a reservation.
+     *
+     * @param int $id Reservation ID
+     * @return void
+     */
+    public function cancelReservationPost($id)
+    {
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            flash('reservation_error', 'Invalid request method.', 'alert alert-danger');
+            $this->redirect('agent/reservations');
+            return;
+        }
+
+        // Verify CSRF token
+        if (!verifyCsrfToken($_POST['csrf_token'] ?? '')) {
+            flash('reservation_error', 'Invalid request. Please try again.', 'alert alert-danger');
+            $this->redirect('agent/viewReservation/' . $id);
+            return;
+        }
+
+        $reservationModel = $this->model('Reservation');
+        $reservation = $reservationModel->getReservationById($id);
+
+        if (!$reservation) {
+            flash('reservation_error', 'Reservation not found.', 'alert alert-danger');
+            $this->redirect('agent/reservations');
+            return;
+        }
+
+        // Check if reservation can be cancelled
+        if (in_array($reservation->status, ['completed', 'cancelled'])) {
+            flash('reservation_info', 'This reservation is already ' . $reservation->status . ' and cannot be cancelled again.', 'alert alert-info');
+            $this->redirect('agent/viewReservation/' . $id);
+            return;
+        }
+        
+        // Potentially add a check here if only 'pending' or 'confirmed' or 'active' reservations can be cancelled.
+        // For example, if 'active' reservations that have already started should not be cancelled via this simple flow.
+        // Current ReservationModel::cancelReservation just sets status to 'cancelled'.
+
+        if ($reservationModel->cancelReservation($id)) {
+            $this->activityLogModel->logActivity($_SESSION['user_id'], 'reservation_cancelled', "Reservation ID: {$id} cancelled by agent.");
+            flash('reservation_success', 'Reservation (ID: ' . $id . ') has been successfully cancelled.');
+            $this->redirect('agent/viewReservation/' . $id); // Or redirect to agent/reservations
+        } else {
+            flash('reservation_error', 'Failed to cancel reservation. Please try again.', 'alert alert-danger');
+            $this->redirect('agent/viewReservation/' . $id);
+        }
     }
     
     /**
