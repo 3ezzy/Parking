@@ -138,8 +138,16 @@
                                     <?php endif; ?>
                                 <?php elseif ($reservation->status === 'completed'): ?>
                                     <span class="text-green-600">Completed</span>
-                                <?php else: ?>
+                                <?php elseif ($reservation->status === 'pending'): ?>
+                                    <span class="text-purple-600">Pending</span>
+                                <?php elseif ($reservation->status === 'confirmed'): ?>
+                                    <span class="text-blue-600">Confirmed</span>
+                                <?php elseif ($reservation->status === 'cancelled'): ?>
                                     <span class="text-red-600">Cancelled</span>
+                                <?php elseif ($reservation->status === 'no_show'): ?>
+                                    <span class="text-gray-600">No Show</span>
+                                <?php else: ?>
+                                    <span class="text-gray-600"><?= ucfirst($reservation->status) ?></span>
                                 <?php endif; ?>
                             </p>
                         </div>
@@ -234,9 +242,12 @@
                             <i class="fas fa-edit mr-2"></i> Edit Reservation
                         </a>
                         
-                        <button onclick="confirmCancel(<?= $reservation->id ?>, '<?= $reservation->customer_name ?>')" class="block w-full text-center bg-red-600 hover:bg-red-700 text-white px-4 py-3 rounded-lg shadow-md transition">
-                            <i class="fas fa-times mr-2"></i> Cancel Reservation
-                        </button>
+                        <form id="cancelReservationForm_<?= $reservation->id ?>" action="<?= URL_ROOT ?>/agent/cancelReservationPost/<?= $reservation->id ?>" method="POST" class="inline">
+                            <input type="hidden" name="csrf_token" value="<?= generateCsrfToken(); ?>">
+                            <button type="button" onclick="confirmAndSubmitCancel(<?= $reservation->id ?>, '<?= htmlspecialchars(addslashes($reservation->customer_name)) ?>')" class="block w-full text-center bg-red-600 hover:bg-red-700 text-white px-4 py-3 rounded-lg shadow-md transition">
+                                <i class="fas fa-times mr-2"></i> Cancel Reservation
+                            </button>
+                        </form>
                     <?php elseif ($reservation->status === 'completed'): ?>
                         <p class="text-center text-gray-700">This reservation has been completed and cannot be modified.</p>
                     <?php else: ?>
@@ -338,6 +349,14 @@
             cancelModal.classList.remove('hidden');
         }
     }
+</script>
+
+<script>
+function confirmAndSubmitCancel(reservationId, customerName) {
+    if (confirm(`Are you sure you want to cancel the reservation for ${customerName} (ID: ${reservationId})? This action cannot be undone.`)) {
+        document.getElementById('cancelReservationForm_' + reservationId).submit();
+    }
+}
 </script>
 
 <?php require APP . 'views/includes/footer.php'; ?>
