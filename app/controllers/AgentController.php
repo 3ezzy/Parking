@@ -276,142 +276,159 @@ class AgentController extends Controller
      * @return void
      */
     public function createReservation()
-    {
-        // Initialize data array
-        $data = [
-            'title' => 'Create New Reservation',
-            'formData' => [],
-            'errors' => [],
-            'spaces' => [],
-            'vehicleTypes' => []
+{
+    // Initialize data array
+    $data = [
+        'title' => 'Create New Reservation',
+        'formData' => [],
+        'errors' => [],
+        'spaces' => [],
+        'vehicleTypes' => [],
+    ];
+
+    // Load available spaces and vehicle types
+    $data['spaces'] = $this->parkingSpaceModel->getAvailableSpaces();
+    $vehicleTypeModel = $this->model('Vehicle');
+    $data['vehicleTypes'] = $vehicleTypeModel->getVehicleTypes();
+
+    // Process form submission
+    if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+        // Sanitize POST data
+        $_POST = filter_input_array(INPUT_POST, FILTER_SANITIZE_STRING);
+
+        // Get form data
+        $data['formData'] = [
+            'customer_name'    => trim($_POST['customer_name']),
+            'customer_email'   => trim($_POST['customer_email']),
+            'customer_phone'   => trim($_POST['customer_phone']),
+            'space_id'         => (int)$_POST['space_id'],
+            'vehicle_type_id'  => !empty($_POST['vehicle_type_id']) ? (int)$_POST['vehicle_type_id'] : null,
+            'license_plate'    => !empty($_POST['license_plate']) ? trim($_POST['license_plate']) : null,
+            'start_time'       => trim($_POST['start_time']),
+            'end_time'         => trim($_POST['end_time']),
+            'notes'            => !empty($_POST['notes']) ? trim($_POST['notes']) : null
         ];
-        
-        // Load available spaces and vehicle types
-        $data['spaces'] = $this->parkingSpaceModel->getAvailableSpaces();
-        $vehicleTypeModel = $this->model('Vehicle');
-        $data['vehicleTypes'] = $vehicleTypeModel->getVehicleTypes();
-        
-        // Process form submission
-        if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-            // Sanitize POST data
-            $_POST = filter_input_array(INPUT_POST, FILTER_SANITIZE_STRING);
-            
-            // Get form data
-            $data['formData'] = [
-                'customer_name' => trim($_POST['customer_name']),
-                'customer_email' => trim($_POST['customer_email']),
-                'customer_phone' => trim($_POST['customer_phone']),
-                'space_id' => (int)$_POST['space_id'],
-                'vehicle_type_id' => !empty($_POST['vehicle_type_id']) ? (int)$_POST['vehicle_type_id'] : null,
-                'license_plate' => !empty($_POST['license_plate']) ? trim($_POST['license_plate']) : null,
-                'start_time' => trim($_POST['start_time']),
-                'end_time' => trim($_POST['end_time']),
-                'notes' => !empty($_POST['notes']) ? trim($_POST['notes']) : null
-            ];
-            
-            // Validate data
-            if (empty($data['formData']['customer_name'])) {
-                $data['errors']['customer_name'] = 'Customer name is required';
-            }
-            
-            if (empty($data['formData']['space_id'])) {
-                $data['errors']['space_id'] = 'Please select a parking space';
-            }
-            
-            if (empty($data['formData']['start_time'])) {
-                $data['errors']['start_time'] = 'Start time is required';
-            }
-            
-            if (empty($data['formData']['end_time'])) {
-                $data['errors']['end_time'] = 'End time is required';
-            }
-            
-            // Validate times
-            $startTime = strtotime($data['formData']['start_time']);
-            $endTime = strtotime($data['formData']['end_time']);
-            
+
+        // Validate data
+        if (empty($data['formData']['customer_name'])) {
+            $data['errors']['customer_name'] = 'Customer name is required';
+        }
+        if (empty($data['formData']['customer_email'])) {
+            $data['errors']['customer_email'] = 'Customer email is required';
+        } elseif (!filter_var($data['formData']['customer_email'], FILTER_VALIDATE_EMAIL)) {
+            $data['errors']['customer_email'] = 'Invalid email format';
+        }
+        if (empty($data['formData']['customer_phone'])) {
+            $data['errors']['customer_phone'] = 'Customer phone is required';
+        }
+        if (empty($data['formData']['space_id'])) {
+            $data['errors']['space_id'] = 'Please select a parking space';
+        }
+        if (empty($data['formData']['vehicle_type_id'])) {
+            $data['errors']['vehicle_type_id'] = 'Please select vehicle type';
+        }
+        if (empty($data['formData']['start_time'])) {
+            $data['errors']['start_time'] = 'Start time is required';
+        }
+        if (empty($data['formData']['end_time'])) {
+            $data['errors']['end_time'] = 'End time is required';
+        }
+
+        // Validate times if provided
+        $startTime = strtotime($data['formData']['start_time']);
+        $endTime = strtotime($data['formData']['end_time']);
+        if ($startTime && $endTime) {
             if ($startTime >= $endTime) {
                 $data['errors']['end_time'] = 'End time must be after start time';
             }
-            
             if ($startTime < time()) {
                 $data['errors']['start_time'] = 'Start time cannot be in the past';
             }
-            
-            // If no errors, create reservation
-            if (empty($data['errors'])) {
-                $reservationModel = $this->model('Reservation');
-                
-                // Check for time conflicts
-                if ($reservationModel->hasTimeConflict($data['formData']['space_id'], $data['formData']['start_time'], $data['formData']['end_time'])) {
-                    $data['errors']['time_conflict'] = 'There is a time conflict with another reservation for this space';
-                    $this->view('agent/create_reservation', $data);
-                    return;
-                }
-                
-                // Handle vehicle first - vehicle_id is required in the database
-                $vehicleModel = $this->model('Vehicle');
-                $vehicleId = null;
-                
-                // If license plate is provided, find or create the vehicle
-                if (!empty($data['formData']['license_plate'])) {
-                    // Try to find existing vehicle
-                    $vehicle = $vehicleModel->getVehicleByLicensePlate($data['formData']['license_plate']);
-                    
-                    if ($vehicle) {
-                        $vehicleId = $vehicle->id;
-                    } else {
-                        // Create new vehicle
-                        $vehicleTypeId = !empty($data['formData']['vehicle_type_id']) ? $data['formData']['vehicle_type_id'] : 1; // Default to type 1 (Car) if not specified
-                        $vehicleData = [
-                            'license_plate' => $data['formData']['license_plate'],
-                            'type_id' => $vehicleTypeId,
-                            'owner_name' => $data['formData']['customer_name'],
-                            'owner_phone' => $data['formData']['customer_phone'] ?? null
-                        ];
-                        
-                        $vehicleId = $vehicleModel->createVehicle($vehicleData);
-                    }
+        }
+
+        // If no errors, create reservation
+        if (empty($data['errors'])) {
+            $reservationModel = $this->model('Reservation');
+
+            // Check for time conflicts
+            if ($reservationModel->hasTimeConflict(
+                $data['formData']['space_id'],
+                $data['formData']['start_time'],
+                $data['formData']['end_time']
+            )) {
+                $data['errors']['time_conflict'] = 'There is a time conflict with another reservation for this space';
+                $this->view('agent/create_reservation', $data);
+                return;
+            }
+
+            // Handle vehicle first - vehicle_id is required in the database
+            $vehicleModel = $this->model('Vehicle');
+            $vehicleId = null;
+
+            // If license plate is provided, find or create the vehicle
+            if (!empty($data['formData']['license_plate'])) {
+                // Try to find existing vehicle
+                $vehicle = $vehicleModel->getVehicleByLicensePlate($data['formData']['license_plate']);
+
+                if ($vehicle) {
+                    $vehicleId = $vehicle->id;
                 } else {
-                    // No license plate provided, create a temporary vehicle with a placeholder license plate
-                    $placeholderLicense = 'TEMP-' . time() . '-' . rand(1000, 9999);
-                    $vehicleTypeId = !empty($data['formData']['vehicle_type_id']) ? $data['formData']['vehicle_type_id'] : 1; // Default to type 1 (Car) if not specified
+                    // Create new vehicle
                     $vehicleData = [
-                        'license_plate' => $placeholderLicense,
-                        'type_id' => $vehicleTypeId,
+                        'license_plate' => $data['formData']['license_plate'],
+                        'type_id' => $data['formData']['vehicle_type_id'],
                         'owner_name' => $data['formData']['customer_name'],
-                        'owner_phone' => $data['formData']['customer_phone'] ?? null
+                        'owner_phone' => $data['formData']['customer_phone']
                     ];
-                    
                     $vehicleId = $vehicleModel->createVehicle($vehicleData);
                 }
-                
-                // If we couldn't create or find a vehicle, show an error
-                if (!$vehicleId) {
-                    $data['errors']['general'] = 'Failed to create or find vehicle';
-                    $this->view('agent/create_reservation', $data);
-                    return;
-                }
-                
-                $spaceId = $data['formData']['space_id'];
-                $startTime = $data['formData']['start_time'];
-                $endTime = $data['formData']['end_time'];
-                $userId = $_SESSION['user_id'];
-                
-                $reservationId = $reservationModel->createReservation($vehicleId, $spaceId, $startTime, $endTime, $userId);
-                
-                if ($reservationId) {
-                    flash('reservation_success', 'Reservation created successfully');
-                    $this->redirect('agent/viewReservation/' . $reservationId);
-                    return;
-                } else {
-                    $data['errors']['general'] = 'Failed to create reservation';
-                }
+            } else {
+                // No license plate provided, create a temporary vehicle with a placeholder license plate
+                $placeholderLicense = 'TEMP-' . time() . '-' . rand(1000, 9999);
+                $vehicleData = [
+                    'license_plate' => $placeholderLicense,
+                    'type_id' => $data['formData']['vehicle_type_id'],
+                    'owner_name' => $data['formData']['customer_name'],
+                    'owner_phone' => $data['formData']['customer_phone']
+                ];
+                $vehicleId = $vehicleModel->createVehicle($vehicleData);
+            }
+
+            // If we couldn't create or find a vehicle, show an error
+            if (!$vehicleId) {
+                $data['errors']['general'] = 'Failed to create or find vehicle';
+                $this->view('agent/create_reservation', $data);
+                return;
+            }
+
+            // Assemble reservation data for insertion
+            $reservationData = [
+                'vehicle_id'      => $vehicleId,
+                'space_id'        => $data['formData']['space_id'],
+                'start_time'      => $data['formData']['start_time'],
+                'end_time'        => $data['formData']['end_time'],
+                'created_by'      => $_SESSION['user_id'],
+                'customer_email'  => $data['formData']['customer_email'],
+                'customer_phone'  => $data['formData']['customer_phone'],
+                'vehicle_type_id' => $data['formData']['vehicle_type_id'],
+                'license_plate'   => $data['formData']['license_plate'],
+                'notes'           => $data['formData']['notes']
+            ];
+
+            $reservationId = $reservationModel->createReservation($reservationData);
+
+            if ($reservationId) {
+                flash('reservation_success', 'Reservation created successfully');
+                $this->redirect('agent/viewReservation/' . $reservationId);
+                return;
+            } else {
+                $data['errors']['general'] = 'Failed to create reservation';
             }
         }
-        
-        $this->view('agent/create_reservation', $data);
     }
+
+    $this->view('agent/create_reservation', $data);
+}
     
     /**
      * View reservation details
