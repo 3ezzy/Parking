@@ -413,182 +413,168 @@ class AdminController extends Controller
      *
      * @return void
      */
-    public function users()
-    {
-        $data = [
-            'title' => 'Manage Users',
-            'users' => [],
-            'errors' => [],
-            'user' => (object)['name' => '', 'email' => '', 'role' => 'agent'] // Default for add form
+   public function users()
+{
+    $data = [
+        'title' => 'Manage Users',
+        'users' => [],
+        'errors' => [],
+        'user' => (object)[
+            'name' => '',
+            'email' => '',
+            'role' => 'agent',
+            'status' => 'active'
+        ]
+    ];
+
+    if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+        $_POST = filter_input_array(INPUT_POST, FILTER_SANITIZE_STRING);
+
+        if (!verifyCsrfToken($_POST['csrf_token'] ?? '')) {
+            flash('user_error', 'CSRF token mismatch. Action aborted.', 'alert alert-danger');
+            $this->redirect('admin/users');
+            return;
+        }
+
+        $name = trim($_POST['name'] ?? '');
+        $email = trim($_POST['email'] ?? '');
+        $password = trim($_POST['password'] ?? '');
+        $role = trim($_POST['role'] ?? 'agent');
+        $status = trim($_POST['status'] ?? 'active');
+
+        $data['user'] = (object)[
+            'name' => $name,
+            'email' => $email,
+            'role' => $role,
+            'status' => $status
         ];
 
-        if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-            // This POST is for adding a new user (form action is admin/users)
-            $_POST = filter_input_array(INPUT_POST, FILTER_SANITIZE_STRING);
+        // Validation
+        if (empty($name)) {
+            $data['errors']['name'] = 'Please enter a name';
+        }
+        if (empty($email)) {
+            $data['errors']['email'] = 'Please enter an email';
+        } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            $data['errors']['email'] = 'Please enter a valid email';
+        } elseif ($this->userModel->findByEmail($email)) {
+            $data['errors']['email'] = 'Email is already taken';
+        }
+        if (empty($password)) {
+            $data['errors']['password'] = 'Please enter a password';
+        } elseif (strlen($password) < 6) {
+            $data['errors']['password'] = 'Password must be at least 6 characters';
+        }
+        if (empty($role) || !in_array($role, ['admin', 'agent'])) {
+            $data['errors']['role'] = 'Please select a valid role';
+        }
+        if (empty($status) || !in_array($status, ['active', 'inactive'])) {
+            $data['errors']['status'] = 'Please select a valid status';
+        }
 
-            if (!verifyCsrfToken($_POST['csrf_token'] ?? '')) {
-                flash('user_error', 'CSRF token mismatch. Action aborted.', 'alert alert-danger');
+        if (empty($data['errors'])) {
+            $userData = [
+                'name' => $name,
+                'email' => $email,
+                'password' => $password, // hash in model
+                'role' => $role,
+                'status' => $status
+            ];
+
+            if ($this->userModel->register($userData)) {
+                flash('user_success', 'User added successfully');
                 $this->redirect('admin/users');
                 return;
-            }
-
-            // 'add_user' might be a specific submit button name, or just implied by POSTing to admin/users
-            // For now, assume any POST to this method is an attempt to add a user.
-            $name = trim($_POST['name'] ?? '');
-            $email = trim($_POST['email'] ?? '');
-            $password = trim($_POST['password'] ?? '');
-            $role = trim($_POST['role'] ?? 'agent'); // Default role if not provided
-
-            $data['user'] = (object)['name' => $name, 'email' => $email, 'role' => $role]; // Repopulate form
-
-            if (empty($name)) {
-                $data['errors']['name'] = 'Please enter a name';
-            }
-            if (empty($email)) {
-                $data['errors']['email'] = 'Please enter an email';
-            } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
-                $data['errors']['email'] = 'Please enter a valid email';
-            } elseif ($this->userModel->findByEmail($email)) {
-                $data['errors']['email'] = 'Email is already taken';
-            }
-            if (empty($password)) {
-                $data['errors']['password'] = 'Please enter a password';
-            } elseif (strlen($password) < 6) {
-                $data['errors']['password'] = 'Password must be at least 6 characters';
-            }
-            // Add role validation if necessary, e.g., ensure it's one of the allowed roles.
-
-            if (empty($data['errors'])) {
-                $userData = [
-                    'name' => $name,
-                    'email' => $email,
-                    'password' => $password, // Remember to hash this in the model's register method
-                    'role' => $role
-                ];
-                if ($role === 'admin' || $role === 'agent') {
-                    $userData['status'] = 'active';
-                }
-
-                if ($this->userModel->register($userData)) {
-                    flash('user_success', 'User added successfully');
-                    $this->redirect('admin/users');
-                    return;
-                } else {
-                    flash('user_error', 'Failed to add user. Please try again.', 'alert alert-danger');
-                    // Errors will be displayed on the form, $data already prepared
-                }
+            } else {
+                flash('user_error', 'Failed to add user. Please try again.', 'alert alert-danger');
             }
         }
-
-        // For GET request, or if POST had errors and didn't redirect:
-        $data['users'] = $this->userModel->findAll(); // Get all users for the list
-        $this->view('admin/users', $data);
+        // If errors, fall through to view
     }
-    
-    /**
-     * Reports page
-     *
-     * @return void
-     */
-    /**
-     * Delete a user
-     *
-     * @param int $userId User ID
-     * @return void
-     */
-    public function editUser($id)
-    {
-        // Ensure $id is an integer
-        $id = (int)$id;
-        if ($id <= 0) {
-            flash('user_error', 'Invalid user ID.', 'alert alert-danger');
-            $this->redirect('admin/users');
+
+    $data['users'] = $this->userModel->findAll();
+    $this->view('admin/users', $data);
+}
+
+public function editUser($id)
+{
+    $id = (int)$id;
+    if ($id <= 0) {
+        flash('user_error', 'Invalid user ID.', 'alert alert-danger');
+        $this->redirect('admin/users');
+        return;
+    }
+
+    $userToEdit = $this->userModel->findById($id);
+    if (!$userToEdit) {
+        flash('user_error', 'User not found.', 'alert alert-danger');
+        $this->redirect('admin/users');
+        return;
+    }
+
+    $data = [
+        'title' => 'Edit User',
+        'users' => $this->userModel->findAll(),
+        'user' => $userToEdit,
+        'errors' => []
+    ];
+
+    if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+        $_POST = filter_input_array(INPUT_POST, FILTER_SANITIZE_STRING);
+
+        if (!verifyCsrfToken($_POST['csrf_token'] ?? '')) {
+            flash('user_error', 'CSRF token mismatch. Action aborted.', 'alert alert-danger');
+            $this->redirect('admin/editUser/' . $id);
             return;
         }
 
-        $userToEdit = $this->userModel->findById($id);
-        if (!$userToEdit) {
-            flash('user_error', 'User not found.', 'alert alert-danger');
-            $this->redirect('admin/users');
-            return;
+        $name = trim($_POST['name'] ?? '');
+        $role = trim($_POST['role'] ?? '');
+        $status = trim($_POST['status'] ?? $userToEdit->status);
+
+        $data['user']->name = $name;
+        $data['user']->role = $role;
+        $data['user']->status = $status;
+
+        if (empty($name)) {
+            $data['errors']['name'] = 'Please enter a name';
+        }
+        if (empty($role) || !in_array($role, ['admin', 'agent'])) {
+            $data['errors']['role'] = 'Please select a valid role';
+        }
+        if (empty($status) || !in_array($status, ['active', 'inactive'])) {
+            $data['errors']['status'] = 'Please select a valid status';
+        }
+        if ($id === 1 && $role !== 'admin') {
+            $data['errors']['role'] = 'Primary admin role cannot be changed.';
+        }
+        if (isset($_SESSION['user_id']) && $_SESSION['user_id'] == $id && $userToEdit->role === 'admin' && $role !== 'admin') {
+            $data['errors']['role'] = 'You cannot change your own role from admin.';
         }
 
-        $data = [
-            'title' => 'Edit User',
-            'users' => $this->userModel->findAll(), // For the list in the background
-            'user' => $userToEdit, // Pre-fill form for editing
-            'errors' => []
-        ];
+        if (empty($data['errors'])) {
+            $updateData = [
+                'name' => $name,
+                'role' => $role,
+                'status' => $status
+            ];
 
-        if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-            $_POST = filter_input_array(INPUT_POST, FILTER_SANITIZE_STRING);
+            if ($id === 1 && $role === 'admin') {
+                $updateData['status'] = 'active';
+            }
 
-            if (!verifyCsrfToken($_POST['csrf_token'] ?? '')) {
-                flash('user_error', 'CSRF token mismatch. Action aborted.', 'alert alert-danger');
-                // $this->view('admin/users', $data); // Re-show edit form with error
-                $this->redirect('admin/editUser/' . $id); // Or redirect back to GET edit page
+            if ($this->userModel->update($id, $updateData)) {
+                flash('user_success', 'User updated successfully');
+                $this->redirect('admin/users');
                 return;
-            }
-
-            $name = trim($_POST['name'] ?? '');
-            $role = trim($_POST['role'] ?? '');
-            // Update $data['user'] with submitted values for form repopulation on error
-            $data['user']->name = $name;
-            $data['user']->role = $role;
-
-            if (empty($name)) {
-                $data['errors']['name'] = 'Please enter a name';
-            }
-            // Add role validation if necessary
-            if (empty($role) || !in_array($role, ['admin', 'agent', 'customer'])) { // Assuming 'customer' is another role
-                 // $data['errors']['role'] = 'Please select a valid role';
-                 // For now, we only ensure admin/agent get active status. Other roles are permitted.
-            }
-
-            // Prevent changing role of primary admin (ID 1) or self to non-admin
-            if ($id === 1 && $role !== 'admin') {
-                 $data['errors']['role'] = 'Primary admin role cannot be changed.';
-            }
-            if (isset($_SESSION['user_id']) && $_SESSION['user_id'] == $id && $userToEdit->role === 'admin' && $role !== 'admin'){
-                $data['errors']['role'] = 'You cannot change your own role from admin.';
-            }
-
-
-            if (empty($data['errors'])) {
-                $updateData = [
-                    'name' => $name,
-                    'role' => $role
-                ];
-
-                // Logic for 'status' based on role
-                if ($role === 'admin' || $role === 'agent') {
-                    $updateData['status'] = 'active';
-                } elseif (isset($_POST['status'])) { // If status field is part of edit form for other roles
-                    $updateData['status'] = trim($_POST['status']);
-                } else {
-                    // If status is not in form, and role is not admin/agent, status remains unchanged by this logic.
-                    // If you want to ensure it's explicitly set, you might need to fetch current status.
-                    // For now, if 'status' is not in $updateData, model->update should not change it.
-                }
-                
-                // Prevent primary admin (ID 1) from having status other than active if they are admin
-                if ($id === 1 && $updateData['role'] === 'admin') {
-                    $updateData['status'] = 'active';
-                }
-
-                if ($this->userModel->update($id, $updateData)) {
-                    flash('user_success', 'User updated successfully');
-                    $this->redirect('admin/users');
-                    return;
-                } else {
-                    flash('user_error', 'Failed to update user. Please try again.', 'alert alert-danger');
-                    // $data['errors'] already populated, $data['user'] updated for repopulation
-                }
+            } else {
+                flash('user_error', 'Failed to update user. Please try again.', 'alert alert-danger');
             }
         }
-        // For GET request, or if POST had errors:
-        $this->view('admin/users', $data);
+        // If errors, fall through to view
     }
+    $this->view('admin/users', $data);
+}
 
     public function resetPassword($id)
     {
