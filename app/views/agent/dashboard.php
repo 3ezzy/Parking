@@ -126,7 +126,7 @@
 <div class="bg-white rounded-lg shadow-md p-6">
     <div class="flex justify-between items-center mb-4">
         <h2 class="text-xl font-semibold text-blue-800">Active Parking Tickets</h2>
-        <a href="<?= URL_ROOT ?>/agent/searchTickets" class="text-blue-600 hover:underline text-sm">View All</a>
+        <a href="<?= URL_ROOT ?>/agent/searchTickets" class="text-blue-600 hover:underline text-sm">View All Tickets & Reservations</a>
     </div>
     
     <?php if (empty($activeTickets)): ?>
