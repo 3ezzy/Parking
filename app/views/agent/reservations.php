@@ -119,7 +119,19 @@
                             <td class="px-4 py-2 border"><?= $reservation->space_number ?> (<?= $reservation->space_type ?>)</td>
                             <td class="px-4 py-2 border"><?= date('M d, Y H:i', strtotime($reservation->start_time)) ?></td>
                             <td class="px-4 py-2 border"><?= date('M d, Y H:i', strtotime($reservation->end_time)) ?></td>
-                            <td class="px-4 py-2 border"><?= !empty($reservation->license_plate) ? $reservation->license_plate : 'Not specified' ?></td>
+                            <td class="px-4 py-2 border">
+                                <?php if (!empty($reservation->license_plate)): ?>
+                                    <span class="block font-medium"><?= $reservation->license_plate ?></span>
+                                <?php endif; ?>
+                                <?php if (!empty($reservation->vehicle_type_name)): ?>
+                                    <span class="block text-xs text-gray-600"><?= $reservation->vehicle_type_name ?></span>
+                                <?php else: ?>
+                                    <span class="block text-xs text-gray-500">Type not specified</span>
+                                <?php endif; ?>
+                                <?php if (empty($reservation->license_plate)): ?>
+                                    <span class="text-gray-500">Not specified</span>
+                                <?php endif; ?>
+                            </td>
                             <td class="px-4 py-2 border">
                                 <?php if ($reservation->status === 'active'): ?>
                                     <?php if (strtotime($reservation->start_time) <= time() && strtotime($reservation->end_time) >= time()): ?>
@@ -155,15 +167,33 @@
                                                 <i class="fas fa-car"></i> Register Entry
                                             </a>
                                         <?php endif; ?>
-                                        
+                                    <?php endif; ?>
+                                    
+                                    <?php if (in_array($reservation->status, ['pending', 'confirmed', 'active'])): ?>
                                         <a href="<?= URL_ROOT ?>/agent/editReservation/<?= $reservation->id ?>" class="text-yellow-600 hover:underline text-sm">
                                             <i class="fas fa-edit"></i> Edit
                                         </a>
                                         
-                                        <button onclick="confirmCancel(<?= $reservation->id ?>, '<?= $reservation->customer_name ?>')" class="text-red-600 hover:underline text-sm text-left">
+                                        <button onclick="openStatusModal(<?= $reservation->id ?>, '<?= $reservation->status ?>', '<?= htmlspecialchars($reservation->customer_name) ?>')" class="text-purple-600 hover:underline text-sm text-left">
+                                            <i class="fas fa-exchange-alt"></i> Change Status
+                                        </button>
+                                    <?php endif; ?>
+                                    
+                                    <?php if (in_array($reservation->status, ['active', 'checked_in', 'completed'])): ?>
+                                        <a href="<?= URL_ROOT ?>/agent/processReservationPayment/<?= $reservation->id ?>" class="text-green-600 hover:underline text-sm">
+                                            <i class="fas fa-dollar-sign"></i> Process Payment
+                                        </a>
+                                    <?php endif; ?>
+                                    
+                                    <?php if ($reservation->status !== 'completed' && $reservation->status !== 'cancelled'): ?>
+                                        <button onclick="confirmCancel(<?= $reservation->id ?>, '<?= htmlspecialchars($reservation->customer_name) ?>')" class="text-orange-600 hover:underline text-sm text-left">
                                             <i class="fas fa-times"></i> Cancel
                                         </button>
                                     <?php endif; ?>
+                                    
+                                    <button onclick="confirmDelete(<?= $reservation->id ?>, '<?= htmlspecialchars($reservation->customer_name) ?>')" class="text-red-600 hover:underline text-sm text-left">
+                                        <i class="fas fa-trash"></i> Delete
+                                    </button>
                                 </div>
                             </td>
                         </tr>
@@ -214,6 +244,57 @@
     </div>
 </div>
 
+<!-- Status Change Modal -->
+<div id="status-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden z-50">
+    <div class="bg-white rounded-lg p-6 w-96">
+        <h2 class="text-xl font-bold mb-4">Change Reservation Status</h2>
+        <p id="status-message" class="mb-4"></p>
+        
+        <form id="status-form" method="POST">
+            <input type="hidden" name="csrf_token" value="<?= generateCsrfToken() ?>">
+            <div class="mb-4">
+                <label for="new-status" class="block text-gray-700 mb-2 font-medium">New Status:</label>
+                <select id="new-status" name="new_status" class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 border-gray-300" required>
+                    <option value="">Select Status</option>
+                    <option value="confirmed">Confirmed</option>
+                    <option value="active">Active</option>
+                    <option value="checked_in">Checked In</option>
+                    <option value="completed">Completed</option>
+                    <option value="no_show">No Show</option>
+                </select>
+            </div>
+            
+            <div class="flex justify-end space-x-2">
+                <button type="button" id="status-modal-close" class="px-4 py-2 bg-gray-300 hover:bg-gray-400 rounded-lg transition">Cancel</button>
+                <button type="submit" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition">Update Status</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Delete Confirmation Modal -->
+<div id="delete-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden z-50">
+    <div class="bg-white rounded-lg p-6 w-96">
+        <h2 class="text-xl font-bold mb-4 text-red-600">
+            <i class="fas fa-exclamation-triangle mr-2"></i>Delete Reservation
+        </h2>
+        <p id="delete-message" class="mb-6"></p>
+        <div class="bg-red-50 border border-red-200 rounded-lg p-3 mb-4">
+            <p class="text-red-700 text-sm">
+                <i class="fas fa-warning mr-1"></i>
+                <strong>Warning:</strong> This action cannot be undone. The reservation will be permanently deleted from the system.
+            </p>
+        </div>
+        
+        <div class="flex justify-end space-x-2">
+            <button id="delete-modal-close" class="px-4 py-2 bg-gray-300 hover:bg-gray-400 rounded-lg transition">Cancel</button>
+            <a id="delete-confirm" href="#" class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition">
+                <i class="fas fa-trash mr-1"></i>Delete Permanently
+            </a>
+        </div>
+    </div>
+</div>
+
 <script>
     function toggleSearchForm() {
         const searchForm = document.getElementById('search-form');
@@ -252,6 +333,45 @@
                 }
             });
         }
+        
+        // Status modal functionality
+        const statusModal = document.getElementById('status-modal');
+        const statusMessage = document.getElementById('status-message');
+        const statusForm = document.getElementById('status-form');
+        const statusModalClose = document.getElementById('status-modal-close');
+        const newStatusSelect = document.getElementById('new-status');
+        
+        if (statusModalClose && statusModal) {
+            statusModalClose.addEventListener('click', function() {
+                statusModal.classList.add('hidden');
+            });
+            
+            // Close modal when clicking outside
+            statusModal.addEventListener('click', function(e) {
+                if (e.target === statusModal) {
+                    statusModal.classList.add('hidden');
+                }
+            });
+        }
+        
+        // Delete modal functionality
+        const deleteModal = document.getElementById('delete-modal');
+        const deleteMessage = document.getElementById('delete-message');
+        const deleteConfirm = document.getElementById('delete-confirm');
+        const deleteModalClose = document.getElementById('delete-modal-close');
+        
+        if (deleteModalClose && deleteModal) {
+            deleteModalClose.addEventListener('click', function() {
+                deleteModal.classList.add('hidden');
+            });
+            
+            // Close modal when clicking outside
+            deleteModal.addEventListener('click', function(e) {
+                if (e.target === deleteModal) {
+                    deleteModal.classList.add('hidden');
+                }
+            });
+        }
     });
     
     function confirmCancel(reservationId, customerName) {
@@ -263,6 +383,49 @@
             cancelMessage.textContent = `Are you sure you want to cancel the reservation for ${customerName}? This action cannot be undone.`;
             cancelConfirm.href = `<?= URL_ROOT ?>/agent/cancelReservation/${reservationId}`;
             cancelModal.classList.remove('hidden');
+        }
+    }
+    
+    function openStatusModal(reservationId, currentStatus, customerName) {
+        const statusModal = document.getElementById('status-modal');
+        const statusMessage = document.getElementById('status-message');
+        const statusForm = document.getElementById('status-form');
+        const newStatusSelect = document.getElementById('new-status');
+        
+        if (statusModal && statusMessage && statusForm && newStatusSelect) {
+            statusMessage.textContent = `Change status for ${customerName}'s reservation (Current: ${currentStatus.charAt(0).toUpperCase() + currentStatus.slice(1)})`;
+            statusForm.action = `<?= URL_ROOT ?>/agent/updateReservationStatus/${reservationId}`;
+            
+            // Filter status options based on current status to show only logical next steps
+            const statusOptions = newStatusSelect.querySelectorAll('option');
+            statusOptions.forEach(option => {
+                option.style.display = 'block'; // Show all by default
+                
+                // Hide current status and some illogical transitions
+                if (option.value === currentStatus) {
+                    option.style.display = 'none';
+                }
+                
+                // Logic for status transitions
+                if (currentStatus === 'completed' || currentStatus === 'cancelled') {
+                    // Completed/cancelled reservations shouldn't be changed
+                    option.style.display = 'none';
+                }
+            });
+            
+            statusModal.classList.remove('hidden');
+        }
+    }
+    
+    function confirmDelete(reservationId, customerName) {
+        const deleteModal = document.getElementById('delete-modal');
+        const deleteMessage = document.getElementById('delete-message');
+        const deleteConfirm = document.getElementById('delete-confirm');
+        
+        if (deleteModal && deleteMessage && deleteConfirm) {
+            deleteMessage.textContent = `Are you sure you want to permanently delete the reservation for ${customerName}?`;
+            deleteConfirm.href = `<?= URL_ROOT ?>/agent/deleteReservation/${reservationId}`;
+            deleteModal.classList.remove('hidden');
         }
     }
 </script>
