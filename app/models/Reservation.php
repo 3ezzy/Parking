@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Models;
 
 use App\Core\Model;
@@ -20,7 +21,7 @@ class Reservation extends Model
     protected $created_by;
     protected $created_at;
     protected $updated_at;
-    
+
     /**
      * Get reservations based on criteria
      *
@@ -43,52 +44,52 @@ class Reservation extends Model
                 LEFT JOIN vehicle_types vt ON v.type_id = vt.id
                 WHERE 1=1
             ";
-            
+
             $params = [];
-            
+
             if (!empty($criteria['customer_name'])) {
                 $sql .= " AND v.owner_name LIKE :customer_name";
                 $params[':customer_name'] = '%' . $criteria['customer_name'] . '%';
             }
-            
+
             if (!empty($criteria['status'])) {
                 $sql .= " AND r.status = :status";
                 $params[':status'] = $criteria['status'];
             }
-            
+
             if (!empty($criteria['date'])) {
                 $sql .= " AND (DATE(r.start_time) = :date OR DATE(r.end_time) = :date)";
                 $params[':date'] = $criteria['date'];
             }
-            
+
             if (!empty($criteria['space_id'])) {
                 $sql .= " AND r.space_id = :space_id";
                 $params[':space_id'] = $criteria['space_id'];
             }
-            
+
             $sql .= " ORDER BY r.start_time ASC";
             $sql .= " LIMIT :limit OFFSET :offset";
-            
+
             $stmt = $this->db->prepare($sql);
-            
+
             // Bind pagination parameters
             $stmt->bindValue(':limit', (int)$limit, PDO::PARAM_INT);
             $stmt->bindValue(':offset', (int)$offset, PDO::PARAM_INT);
-            
+
             // Bind other parameters
             foreach ($params as $key => $value) {
                 $stmt->bindValue($key, $value);
             }
-            
+
             $stmt->execute();
-            
+
             return $stmt->fetchAll(PDO::FETCH_OBJ);
         } catch (\PDOException $e) {
             error_log($e->getMessage());
             return [];
         }
     }
-    
+
     /**
      * Check if there's a time conflict with existing reservations
      *
@@ -110,31 +111,31 @@ class Reservation extends Model
                     (start_time <= :end_time AND end_time >= :start_time)
                 )
             ";
-            
+
             if ($excludeId) {
                 $sql .= " AND id != :exclude_id";
             }
-            
+
             $stmt = $this->db->prepare($sql);
             $stmt->bindParam(':space_id', $spaceId, PDO::PARAM_INT);
             $stmt->bindParam(':start_time', $startTime);
             $stmt->bindParam(':end_time', $endTime);
-            
+
             if ($excludeId) {
                 $stmt->bindParam(':exclude_id', $excludeId, PDO::PARAM_INT);
             }
-            
+
             $stmt->execute();
-            
+
             $result = $stmt->fetch(PDO::FETCH_OBJ);
-            
+
             return $result->conflict_count > 0;
         } catch (\PDOException $e) {
             error_log($e->getMessage());
             return true; // Assume conflict on error to be safe
         }
     }
-    
+
     /**
      * Create a new reservation
      *
@@ -145,31 +146,36 @@ class Reservation extends Model
      * @param int $userId ID of the user creating the reservation
      * @return int|false The reservation ID or false on failure
      */
-    public function createReservation($vehicleId, $spaceId, $startTime, $endTime, $userId)
+    // In your Reservation model:
+    public function createReservation($data)
     {
-        try {
-            $status = 'active'; // Default status for new reservations
-            $stmt = $this->db->prepare("
-                INSERT INTO {$this->table} (
-                    vehicle_id, space_id, start_time, end_time, status, created_by
-                ) VALUES (
-                    :vehicle_id, :space_id, :start_time, :end_time, :status, :created_by
-                )
-            ");
-            $stmt->bindParam(':vehicle_id', $vehicleId, PDO::PARAM_INT);
-            $stmt->bindParam(':space_id', $spaceId, PDO::PARAM_INT);
-            $stmt->bindParam(':start_time', $startTime);
-            $stmt->bindParam(':end_time', $endTime);
-            $stmt->bindParam(':status', $status);
-            $stmt->bindParam(':created_by', $userId, PDO::PARAM_INT);
-            $stmt->execute();
+        $sql = "INSERT INTO reservations (
+        vehicle_id, space_id, start_time, end_time, created_by,
+        customer_email, customer_phone, vehicle_type_id, license_plate, notes
+    ) VALUES (
+        :vehicle_id, :space_id, :start_time, :end_time, :created_by,
+        :customer_email, :customer_phone, :vehicle_type_id, :license_plate, :notes
+    )";
+
+        $stmt = $this->db->prepare($sql);
+
+        $stmt->bindValue(':vehicle_id',      $data['vehicle_id']);
+        $stmt->bindValue(':space_id',        $data['space_id']);
+        $stmt->bindValue(':start_time',      $data['start_time']);
+        $stmt->bindValue(':end_time',        $data['end_time']);
+        $stmt->bindValue(':created_by',      $data['created_by']);
+        $stmt->bindValue(':customer_email',  $data['customer_email']);
+        $stmt->bindValue(':customer_phone',  $data['customer_phone']);
+        $stmt->bindValue(':vehicle_type_id', $data['vehicle_type_id']);
+        $stmt->bindValue(':license_plate',   $data['license_plate']);
+        $stmt->bindValue(':notes',           $data['notes']);
+
+        if ($stmt->execute()) {
             return $this->db->lastInsertId();
-        } catch (\PDOException $e) {
-            error_log($e->getMessage());
-            return false;
         }
+        return false;
     }
-    
+
     /**
      * Get a reservation by ID
      *
@@ -198,7 +204,7 @@ class Reservation extends Model
             return false;
         }
     }
-    
+
     /**
      * Update the status of a specific reservation.
      *
@@ -215,10 +221,10 @@ class Reservation extends Model
                     updated_at = CURRENT_TIMESTAMP
                 WHERE id = :id
             ");
-            
+
             $stmt->bindParam(':status', $newStatus, PDO::PARAM_STR);
             $stmt->bindParam(':id', $id, PDO::PARAM_INT);
-            
+
             return $stmt->execute();
         } catch (\PDOException $e) {
             error_log("Error updating reservation status: " . $e->getMessage());
@@ -249,7 +255,7 @@ class Reservation extends Model
                     updated_at = CURRENT_TIMESTAMP
                 WHERE id = :id
             ");
-            
+
             $stmt->bindParam(':customer_name', $data['customer_name']);
             $stmt->bindParam(':customer_email', $data['customer_email']);
             $stmt->bindParam(':customer_phone', $data['customer_phone']);
@@ -259,14 +265,14 @@ class Reservation extends Model
             $stmt->bindParam(':end_time', $data['end_time']);
             $stmt->bindParam(':notes', $data['notes']);
             $stmt->bindParam(':id', $id, PDO::PARAM_INT);
-            
+
             return $stmt->execute();
         } catch (\PDOException $e) {
             error_log($e->getMessage());
             return false;
         }
     }
-    
+
     /**
      * Cancel a reservation
      *
@@ -282,16 +288,16 @@ class Reservation extends Model
                     updated_at = CURRENT_TIMESTAMP
                 WHERE id = :id
             ");
-            
+
             $stmt->bindParam(':id', $id, PDO::PARAM_INT);
-            
+
             return $stmt->execute();
         } catch (\PDOException $e) {
             error_log($e->getMessage());
             return false;
         }
     }
-    
+
     /**
      * Complete a reservation (mark as completed)
      *
@@ -307,16 +313,16 @@ class Reservation extends Model
                     updated_at = CURRENT_TIMESTAMP
                 WHERE id = :id
             ");
-            
+
             $stmt->bindParam(':id', $id, PDO::PARAM_INT);
-            
+
             return $stmt->execute();
         } catch (\PDOException $e) {
             error_log($e->getMessage());
             return false;
         }
     }
-    
+
     /**
      * Get upcoming reservations for a specific space
      *
@@ -333,10 +339,10 @@ class Reservation extends Model
                 AND end_time > NOW()
                 ORDER BY start_time ASC
             ");
-            
+
             $stmt->bindParam(':space_id', $spaceId, PDO::PARAM_INT);
             $stmt->execute();
-            
+
             return $stmt->fetchAll(PDO::FETCH_OBJ);
         } catch (\PDOException $e) {
             error_log($e->getMessage());
