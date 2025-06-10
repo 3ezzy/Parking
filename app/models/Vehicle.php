@@ -255,4 +255,15 @@ class Vehicle extends Model
             return false;
         }
     }
+    
+    /**
+     * Get a vehicle by ID
+     *
+     * @param int $vehicleId The vehicle ID
+     * @return object|false The vehicle or false if not found
+     */
+    public function getVehicleById($vehicleId)
+    {
+        return $this->findById($vehicleId);
+    }
 }
