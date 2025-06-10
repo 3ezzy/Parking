@@ -303,4 +303,15 @@ class ParkingSpace extends Model
             return false;
         }
     }
+    
+    /**
+     * Get a parking space by ID
+     *
+     * @param int $spaceId The space ID
+     * @return object|false The parking space or false if not found
+     */
+    public function getSpaceById($spaceId)
+    {
+        return $this->findById($spaceId);
+    }
 }
