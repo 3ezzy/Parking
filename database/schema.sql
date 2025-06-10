@@ -88,12 +88,19 @@ CREATE TABLE reservations (
     space_id INT NOT NULL,
     start_time DATETIME NOT NULL,
     end_time DATETIME NOT NULL,
-    status ENUM('pending', 'confirmed', 'checked_in', 'completed', 'cancelled', 'no_show') NOT NULL DEFAULT 'pending',
+    status ENUM('pending', 'confirmed', 'active', 'checked_in', 'completed', 'cancelled', 'no_show') NOT NULL DEFAULT 'pending',
+    customer_email VARCHAR(100),
+    customer_phone VARCHAR(20),
+    vehicle_type_id INT,
+    license_plate VARCHAR(20),
+    notes TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     created_by INT NOT NULL,
     FOREIGN KEY (vehicle_id) REFERENCES vehicles(id),
     FOREIGN KEY (space_id) REFERENCES parking_spaces(id),
-    FOREIGN KEY (created_by) REFERENCES users(id)
+    FOREIGN KEY (created_by) REFERENCES users(id),
+    FOREIGN KEY (vehicle_type_id) REFERENCES vehicle_types(id)
 );
 
 -- Payments
