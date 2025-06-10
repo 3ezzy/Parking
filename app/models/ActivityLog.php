@@ -23,6 +23,21 @@ class ActivityLog extends Model
         return $this->create($data);
     }
 
+    /**
+     * Log an activity (alias for log method to match controller usage)
+     * 
+     * @param int $userId User ID
+     * @param string $activityType Type of activity
+     * @param string $description Description of the activity
+     * @param string|null $ipAddress IP address (optional)
+     * @return bool Success status
+     */
+    public function logActivity($userId, $activityType, $description, $ipAddress = null)
+    {
+        $activity = $activityType . ': ' . $description;
+        return $this->log($userId, $activity, $ipAddress);
+    }
+
     public function getByUser($userId, $limit = 10, $offset = 0)
     {
         $stmt = $this->db->prepare("SELECT * FROM {$this->table} WHERE user_id = :user_id ORDER BY timestamp DESC LIMIT :limit OFFSET :offset");
