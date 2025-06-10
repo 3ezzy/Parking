@@ -242,6 +242,12 @@
                             <i class="fas fa-edit mr-2"></i> Edit Reservation
                         </a>
                         
+                        <?php if (in_array($reservation->status, ['active', 'checked_in', 'completed'])): ?>
+                            <a href="<?= URL_ROOT ?>/agent/processReservationPayment/<?= $reservation->id ?>" class="block w-full text-center bg-green-600 hover:bg-green-700 text-white px-4 py-3 rounded-lg shadow-md transition">
+                                <i class="fas fa-dollar-sign mr-2"></i> Process Payment
+                            </a>
+                        <?php endif; ?>
+                        
                         <form id="cancelReservationForm_<?= $reservation->id ?>" action="<?= URL_ROOT ?>/agent/cancelReservationPost/<?= $reservation->id ?>" method="POST" class="inline">
                             <input type="hidden" name="csrf_token" value="<?= generateCsrfToken(); ?>">
                             <button type="button" onclick="confirmAndSubmitCancel(<?= $reservation->id ?>, '<?= htmlspecialchars(addslashes($reservation->customer_name)) ?>')" class="block w-full text-center bg-red-600 hover:bg-red-700 text-white px-4 py-3 rounded-lg shadow-md transition">
