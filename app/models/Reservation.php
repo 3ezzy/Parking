@@ -35,7 +35,7 @@ class Reservation extends Model
         try {
             $sql = "
                 SELECT r.*, ps.space_number, st.name as space_type, u.name as agent_name, 
-                       v.owner_name as customer_name, vt.name as vehicle_type_name
+                       v.owner_name as customer_name, v.license_plate, vt.name as vehicle_type_name
                 FROM {$this->table} r
                 JOIN parking_spaces ps ON r.space_id = ps.id
                 JOIN space_types st ON ps.type_id = st.id
@@ -50,6 +50,11 @@ class Reservation extends Model
             if (!empty($criteria['customer_name'])) {
                 $sql .= " AND v.owner_name LIKE :customer_name";
                 $params[':customer_name'] = '%' . $criteria['customer_name'] . '%';
+            }
+
+            if (!empty($criteria['license_plate'])) {
+                $sql .= " AND v.license_plate LIKE :license_plate";
+                $params[':license_plate'] = '%' . $criteria['license_plate'] . '%';
             }
 
             if (!empty($criteria['status'])) {
@@ -67,7 +72,38 @@ class Reservation extends Model
                 $params[':space_id'] = $criteria['space_id'];
             }
 
-            $sql .= " ORDER BY r.start_time ASC";
+            // Handle date range filtering
+            if (!empty($criteria['date_range'])) {
+                switch ($criteria['date_range']) {
+                    case 'today':
+                        $sql .= " AND (DATE(r.start_time) = CURDATE() OR DATE(r.end_time) = CURDATE())";
+                        break;
+                    case 'yesterday':
+                        $sql .= " AND (DATE(r.start_time) = DATE_SUB(CURDATE(), INTERVAL 1 DAY) OR DATE(r.end_time) = DATE_SUB(CURDATE(), INTERVAL 1 DAY))";
+                        break;
+                    case 'this_week':
+                        $sql .= " AND (r.start_time >= DATE_SUB(CURDATE(), INTERVAL WEEKDAY(CURDATE()) DAY) OR r.end_time >= DATE_SUB(CURDATE(), INTERVAL WEEKDAY(CURDATE()) DAY))";
+                        break;
+                    case 'last_week':
+                        $sql .= " AND (r.start_time >= DATE_SUB(CURDATE(), INTERVAL WEEKDAY(CURDATE()) + 7 DAY) AND r.start_time < DATE_SUB(CURDATE(), INTERVAL WEEKDAY(CURDATE()) DAY))";
+                        break;
+                    case 'this_month':
+                        $sql .= " AND (MONTH(r.start_time) = MONTH(CURDATE()) AND YEAR(r.start_time) = YEAR(CURDATE()))";
+                        break;
+                    case 'custom':
+                        if (!empty($criteria['date_from'])) {
+                            $sql .= " AND r.start_time >= :date_from";
+                            $params[':date_from'] = $criteria['date_from'] . ' 00:00:00';
+                        }
+                        if (!empty($criteria['date_to'])) {
+                            $sql .= " AND r.start_time <= :date_to";
+                            $params[':date_to'] = $criteria['date_to'] . ' 23:59:59';
+                        }
+                        break;
+                }
+            }
+
+            $sql .= " ORDER BY r.start_time DESC";
             $sql .= " LIMIT :limit OFFSET :offset";
 
             $stmt = $this->db->prepare($sql);
@@ -236,15 +272,23 @@ class Reservation extends Model
      * Update a reservation
      *
      * @param int $id Reservation ID
-     * @param array $data Updated reservation data
+     * @param string $customerName Customer name
+     * @param string $startTime Start time
+     * @param string $endTime End time
+     * @param string $notes Notes
+     * @param int $updatedBy User who updated the reservation
+     * @param string $customerEmail Customer email
+     * @param string $customerPhone Customer phone
+     * @param string $licensePlate License plate
+     * @param int $vehicleTypeId Vehicle type ID
      * @return bool True on success, false on failure
      */
-    public function updateReservation($id, $data)
+    public function updateReservation($id, $customerName, $startTime, $endTime, $notes, $updatedBy, $customerEmail, $customerPhone, $licensePlate, $vehicleTypeId)
     {
         try {
+            // First, update the reservation table
             $stmt = $this->db->prepare("
                 UPDATE {$this->table} SET
-                    customer_name = :customer_name,
                     customer_email = :customer_email,
                     customer_phone = :customer_phone,
                     vehicle_type_id = :vehicle_type_id,
@@ -256,17 +300,39 @@ class Reservation extends Model
                 WHERE id = :id
             ");
 
-            $stmt->bindParam(':customer_name', $data['customer_name']);
-            $stmt->bindParam(':customer_email', $data['customer_email']);
-            $stmt->bindParam(':customer_phone', $data['customer_phone']);
-            $stmt->bindParam(':vehicle_type_id', $data['vehicle_type_id'], PDO::PARAM_INT);
-            $stmt->bindParam(':license_plate', $data['license_plate']);
-            $stmt->bindParam(':start_time', $data['start_time']);
-            $stmt->bindParam(':end_time', $data['end_time']);
-            $stmt->bindParam(':notes', $data['notes']);
+            $stmt->bindParam(':customer_email', $customerEmail);
+            $stmt->bindParam(':customer_phone', $customerPhone);
+            $stmt->bindParam(':vehicle_type_id', $vehicleTypeId, PDO::PARAM_INT);
+            $stmt->bindParam(':license_plate', $licensePlate);
+            $stmt->bindParam(':start_time', $startTime);
+            $stmt->bindParam(':end_time', $endTime);
+            $stmt->bindParam(':notes', $notes);
             $stmt->bindParam(':id', $id, PDO::PARAM_INT);
 
-            return $stmt->execute();
+            $reservationUpdated = $stmt->execute();
+            
+            // Also update the vehicle owner name if the reservation exists
+            if ($reservationUpdated) {
+                $reservationStmt = $this->db->prepare("SELECT vehicle_id FROM {$this->table} WHERE id = :id");
+                $reservationStmt->bindParam(':id', $id, PDO::PARAM_INT);
+                $reservationStmt->execute();
+                $reservation = $reservationStmt->fetch(PDO::FETCH_OBJ);
+                
+                if ($reservation && $reservation->vehicle_id) {
+                    $vehicleStmt = $this->db->prepare("
+                        UPDATE vehicles SET 
+                            owner_name = :owner_name,
+                            owner_phone = :owner_phone
+                        WHERE id = :vehicle_id
+                    ");
+                    $vehicleStmt->bindParam(':owner_name', $customerName);
+                    $vehicleStmt->bindParam(':owner_phone', $customerPhone);
+                    $vehicleStmt->bindParam(':vehicle_id', $reservation->vehicle_id, PDO::PARAM_INT);
+                    $vehicleStmt->execute();
+                }
+            }
+
+            return $reservationUpdated;
         } catch (\PDOException $e) {
             error_log($e->getMessage());
             return false;
@@ -324,6 +390,29 @@ class Reservation extends Model
     }
 
     /**
+     * Delete a reservation permanently
+     *
+     * @param int $id Reservation ID
+     * @return bool True on success, false on failure
+     */
+    public function deleteReservation($id)
+    {
+        try {
+            $stmt = $this->db->prepare("
+                DELETE FROM {$this->table}
+                WHERE id = :id
+            ");
+
+            $stmt->bindParam(':id', $id, PDO::PARAM_INT);
+
+            return $stmt->execute();
+        } catch (\PDOException $e) {
+            error_log($e->getMessage());
+            return false;
+        }
+    }
+
+    /**
      * Get upcoming reservations for a specific space
      *
      * @param int $spaceId Space ID
@@ -347,6 +436,39 @@ class Reservation extends Model
         } catch (\PDOException $e) {
             error_log($e->getMessage());
             return [];
+        }
+    }
+
+    /**
+     * Process payment for a reservation
+     *
+     * @param int $id Reservation ID
+     * @param array $paymentData Payment data including amount_paid, payment_method, payment_notes, payment_time
+     * @return bool True on success, false on failure
+     */
+    public function processReservationPayment($id, $paymentData)
+    {
+        try {
+            $stmt = $this->db->prepare("
+                UPDATE {$this->table} SET
+                    amount_paid = :amount_paid,
+                    payment_method = :payment_method,
+                    payment_notes = :payment_notes,
+                    payment_time = :payment_time,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE id = :id
+            ");
+
+            $stmt->bindParam(':amount_paid', $paymentData['amount_paid']);
+            $stmt->bindParam(':payment_method', $paymentData['payment_method']);
+            $stmt->bindParam(':payment_notes', $paymentData['payment_notes']);
+            $stmt->bindParam(':payment_time', $paymentData['payment_time']);
+            $stmt->bindParam(':id', $id, PDO::PARAM_INT);
+
+            return $stmt->execute();
+        } catch (\PDOException $e) {
+            error_log($e->getMessage());
+            return false;
         }
     }
 }
