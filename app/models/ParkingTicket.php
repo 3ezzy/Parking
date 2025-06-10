@@ -257,7 +257,7 @@ class ParkingTicket extends Model
         try {
             $query = "
                 SELECT pt.*, 
-                    v.license_plate, vt.name as vehicle_type,
+                    v.license_plate, v.owner_name, vt.name as vehicle_type,
                     ps.space_number, st.name as space_type,
                     u.name as created_by_name
                 FROM {$this->table} pt
@@ -275,6 +275,11 @@ class ParkingTicket extends Model
             if (!empty($criteria['license_plate'])) {
                 $query .= " AND v.license_plate LIKE :license_plate";
                 $params[':license_plate'] = '%' . $criteria['license_plate'] . '%';
+            }
+            
+            if (!empty($criteria['customer_name'])) {
+                $query .= " AND v.owner_name LIKE :customer_name";
+                $params[':customer_name'] = '%' . $criteria['customer_name'] . '%';
             }
             
             if (!empty($criteria['status'])) {
@@ -295,6 +300,37 @@ class ParkingTicket extends Model
             if (!empty($criteria['vehicle_type'])) {
                 $query .= " AND v.type_id = :vehicle_type";
                 $params[':vehicle_type'] = $criteria['vehicle_type'];
+            }
+
+            // Handle date range filtering
+            if (!empty($criteria['date_range'])) {
+                switch ($criteria['date_range']) {
+                    case 'today':
+                        $query .= " AND DATE(pt.entry_time) = CURDATE()";
+                        break;
+                    case 'yesterday':
+                        $query .= " AND DATE(pt.entry_time) = DATE_SUB(CURDATE(), INTERVAL 1 DAY)";
+                        break;
+                    case 'this_week':
+                        $query .= " AND pt.entry_time >= DATE_SUB(CURDATE(), INTERVAL WEEKDAY(CURDATE()) DAY)";
+                        break;
+                    case 'last_week':
+                        $query .= " AND pt.entry_time >= DATE_SUB(CURDATE(), INTERVAL WEEKDAY(CURDATE()) + 7 DAY) AND pt.entry_time < DATE_SUB(CURDATE(), INTERVAL WEEKDAY(CURDATE()) DAY)";
+                        break;
+                    case 'this_month':
+                        $query .= " AND MONTH(pt.entry_time) = MONTH(CURDATE()) AND YEAR(pt.entry_time) = YEAR(CURDATE())";
+                        break;
+                    case 'custom':
+                        if (!empty($criteria['date_from'])) {
+                            $query .= " AND pt.entry_time >= :custom_date_from";
+                            $params[':custom_date_from'] = $criteria['date_from'] . ' 00:00:00';
+                        }
+                        if (!empty($criteria['date_to'])) {
+                            $query .= " AND pt.entry_time <= :custom_date_to";
+                            $params[':custom_date_to'] = $criteria['date_to'] . ' 23:59:59';
+                        }
+                        break;
+                }
             }
             
             // Add ordering
